@@ -17,6 +17,7 @@ double angle_increment_=0.0;
 double range_min_ = 0.0;
 double range_max_ = 0.0;
 bool laser_alarm_=false;
+int error_alert = 0;
 
 ros::Publisher lidar_alarm_publisher_;
 ros::Publisher lidar_dist_publisher_;
@@ -28,18 +29,36 @@ void laserCallback(const sensor_msgs::LaserScan& laser_scan) {
         //for first message received, set up the desired index of LIDAR range to eval
         angle_min_ = laser_scan.angle_min;
         angle_max_ = laser_scan.angle_max;
+	ROS_INFO("angle min is: %f", angle_min_);
+	ROS_INFO("angle max is: %f", angle_max_);
         angle_increment_ = laser_scan.angle_increment;
+	ROS_INFO("angle increment is: %f", angle_increment_);
         range_min_ = laser_scan.range_min;
         range_max_ = laser_scan.range_max;
+	ROS_INFO("range min is: %f, range max is: %f", range_min_, range_max_);
         // what is the index of the ping that is straight ahead?
         // BETTER would be to use transforms, which would reference how the LIDAR is mounted;
         // but this will do for simple illustration
-        ping_index_ = (int) (0.0 -angle_min_)/angle_increment_;
+        //ping_index_ = (int) (0.0 -angle_min_)/angle_increment_;
         ROS_INFO("LIDAR setup: ping_index = %d",ping_index_);
         
     }
-    
-   ping_dist_in_front_ = laser_scan.ranges[ping_index_];
+    for(int i = 0; i< (int) (0.0 +angle_max_)/angle_increment_; i++){
+	if (laser_scan.ranges[i] < 1) {
+
+		if(error_alert > 2){
+			ROS_INFO("STOP ping dist in front = %f",laser_scan.ranges[i]);
+			laser_alarm_=true;
+		}
+		else error_alert++;
+	}
+	else {
+		if(error_alert != 0)
+			error_alert--;
+		laser_alarm_=false;
+	}
+    }
+   /*ping_dist_in_front_ = laser_scan.ranges[ping_index_];
    ROS_INFO("ping dist in front = %f",ping_dist_in_front_);
    if (ping_dist_in_front_<MIN_SAFE_DISTANCE) {
        ROS_WARN("DANGER, WILL ROBINSON!!");
@@ -47,7 +66,7 @@ void laserCallback(const sensor_msgs::LaserScan& laser_scan) {
    }
    else {
        laser_alarm_=false;
-   }
+   }*/
    std_msgs::Bool lidar_alarm_msg;
    lidar_alarm_msg.data = laser_alarm_;
    lidar_alarm_publisher_.publish(lidar_alarm_msg);
