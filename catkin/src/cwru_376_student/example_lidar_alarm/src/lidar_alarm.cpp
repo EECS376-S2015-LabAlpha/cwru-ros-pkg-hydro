@@ -43,23 +43,24 @@ void laserCallback(const sensor_msgs::LaserScan& laser_scan) {
         ROS_INFO("LIDAR setup: ping_index = %d",ping_index_);
         
     }
-    double end_angle = angle_max_;
-    double start_angle = angle_min_;
-
-    for(int i = (int)((0 - start_angle + angle_min_)/angle_increment_); i< (int) ((end_angle - start_angle)/angle_increment_); i++){
-    if (laser_scan.ranges[i] < 1) {
-
-        if(error_alert > 2){
-            ROS_INFO("STOP ping dist in front = %f on ping %d",laser_scan.ranges[i], i);
-            laser_alarm_=true;
-        }
-        else error_alert++;
-    }
-    else {
+    //Set the angle of the Lidar sweep here, from (negative) start_angle, to (positive) end_angle
+    double end_angle = 1.047197551;
+    double start_angle = -1.047197551;
+    //-1.047197551 is equivalent to 60 degrees
+    for(int i = (int)((start_angle - angle_min_)/angle_increment_); i< (int) ((end_angle - angle_min_)/angle_increment_); i++){
+      if (laser_scan.ranges[i] < 1) {
+          //Throw the error alert after 3 adjacent Lidar points that are all too close
+          if(error_alert > 2){
+              ROS_INFO("STOP ping dist in front = %f on ping %d",laser_scan.ranges[i], i);
+              laser_alarm_=true;
+          }
+          else error_alert++;
+      }
+      else {
         if(error_alert != 0)
             error_alert--;
         laser_alarm_=false;
-    }
+      }
     }
    /*ping_dist_in_front_ = laser_scan.ranges[ping_index_];
    ROS_INFO("ping dist in front = %f",ping_dist_in_front_);
