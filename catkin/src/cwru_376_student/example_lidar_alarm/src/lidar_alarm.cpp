@@ -4,6 +4,7 @@
 #include <sensor_msgs/LaserScan.h>
 #include <std_msgs/Float32.h> //Including the Float32 class from std_msgs
 #include <std_msgs/Bool.h> // boolean message time
+#include <std_msgs/String.h>
 
 
 const double MIN_SAFE_DISTANCE = 0.5; // set alarm if anything is within 0.5m of the front of robot
