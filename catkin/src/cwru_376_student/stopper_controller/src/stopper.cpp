@@ -6,8 +6,9 @@
 #include <nav_msgs/Odometry.h>
 
 geometry_msgs::Twist last_cmd;
-std::string estop_status;
-std::string lidar_status;
+std::string estop_status = "motors_ENABLED";
+std::string lidar_status = "CLEAR";
+std::string input_status;
 ros::Publisher cmd_pub;
 double last_vel;
 double max_decel = 0.1;
@@ -26,6 +27,10 @@ void commandCB(const geometry_msgs::Twist& cmd) {
 		last_cmd.linear.x = std::max(0.0,last_vel-max_decel);
 		last_cmd.angular.z = 0.0;
 	}
+	else if(strcmp("STOP", input_status.c_str())) {
+		last_cmd.linear.x = std::max(0.0,last_vel-max_decel);
+		last_cmd.angular.z = 0.0;
+	}
 	else { //pass through commands
 		last_cmd.linear.x = cmd.linear.x;
 		last_cmd.angular.z = cmd.angular.z;
@@ -34,8 +39,12 @@ void commandCB(const geometry_msgs::Twist& cmd) {
 
 }
 void lidarStopCB(const std_msgs::String& msg) {
-	if (strcmp(msg.data.c_str(), "clear") == 0) { lidar_status = "CLEAR"; }
+	if (strcmp(msg.data.c_str(), "CLEAR") == 0) { lidar_status = "CLEAR"; }
 	else { lidar_status = "STOP"; }
+}
+void typeStopCB(const std_msgs::String& msg) {
+	if (strcmp(msg.data.c_str(), "CLEAR" == 0)) { input_status = "CLEAR"; }
+	else { input_status = "STOP"; }
 }
 void odomCB(const nav_msgs::Odometry& odom) {
 	last_vel = odom.twist.twist.linear.x;
