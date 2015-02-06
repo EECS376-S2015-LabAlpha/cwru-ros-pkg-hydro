@@ -24,14 +24,16 @@ void commandCB(const geometry_msgs::Twist& cmd) {
 		last_cmd.angular.z = 0.0;
 	}
 	else if(strcmp("STOP",lidar_status.c_str())) {
+		//Lidar stop requested
 		last_cmd.linear.x = std::max(0.0,last_vel-max_decel);
 		last_cmd.angular.z = 0.0;
 	}
 	else if(strcmp("STOP", input_status.c_str())) {
+		// CLI stop requested
 		last_cmd.linear.x = std::max(0.0,last_vel-max_decel);
 		last_cmd.angular.z = 0.0;
 	}
-	else { //pass through commands
+	else { //pass through commands, no stop necessary
 		last_cmd.linear.x = cmd.linear.x;
 		last_cmd.angular.z = cmd.angular.z;
 	}
@@ -53,11 +55,20 @@ void odomCB(const nav_msgs::Odometry& odom) {
 int main(int argc, char **argv) {
 	ros::init(argc, argv, "stopper_controller");
 	ros::NodeHandle n;
-	cmd_pub = n.advertise<geometry_msgs::Twist>("cmd_vel",1);
 
+	//publish on the cmd_velocity topic
+	cmd_pub = n.advertise<geometry_msgs::Twist>("jinx/cmd_vel",1);
+
+	//subscribe to the current state of the e-stop
 	ros::Subscriber estop_sub = n.subscribe("motors_enabled",1,estopCB);
+	//subscribe to requested velocity
 	ros::Subscriber cmd_sub = n.subscribe("request_vel",1,commandCB);
+	//subscribe to lidar stop output
 	ros::Subscriber lidar_sub = n.subscribe("lidar_str",1,lidarStopCB);
+	//subscribe to control strings from command line
+	ros::Subscriber cli_sub = n.subscribe("cmd_str",1,typeStopCB); 
+	//subscribe to odom for proper slowdown on CLI, Lidar stops
+	ros::Subscriber odom_sub = n.subscribe("jinx/odom", 1, odomCB); //need to change for jinx
 
 	ros::spin();
 }
