@@ -20,6 +20,7 @@ double range_max_ = 0.0;
 bool laser_alarm_="STOP";
 int error_alert = 0;
 
+//Declare the publishers here
 ros::Publisher lidar_alarm_publisher_;
 ros::Publisher lidar_dist_publisher_;
 
