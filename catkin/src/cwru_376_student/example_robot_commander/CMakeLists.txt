@@ -17,7 +17,7 @@ catkin_simple()
 # Executables
 cs_add_executable(robot_commander src/example_robot_commander.cpp)
 cs_add_executable(halt_commander src/halt_commander.cpp)
-cs_add_executable(vel_scheduler src/vel_scheduler.cpp)
+#cs_add_executable(vel_scheduler src/vel_scheduler.cpp)
 cs_add_executable(vel_scheduler_jinx src/vel_scheduler_jinx.cpp)
 # target_link_library(example my_lib)
  
