@@ -1,3 +1,6 @@
-# cwru-ros-pkg-hydro-alpha
+# cwru-ros-pkg-hydro
 Updated version of cwru-ros-pkg for hydro support.
-This is a fork of the cwru-ros-pkg-hydro repository for the lab group Alpha.
+Your forked repositories should sync with updates from this repository from now on.
+
+Check the wiki for useful information!
+
