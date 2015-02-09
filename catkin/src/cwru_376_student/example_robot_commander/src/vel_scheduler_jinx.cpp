@@ -36,9 +36,9 @@ therefore, theta = 2*atan2(qz,qw)
 
 
 // set some dynamic limits...
-const double v_max = 5.0; //1m/sec is a slow walk
+const double v_max = 2.0; //1m/sec is a slow walk
 const double v_min = 0.1; // if command velocity too low, robot won't move
-const double a_max = 0.1; //1m/sec^2 is 0.1 g's
+const double a_max = 0.5; //1m/sec^2 is 0.1 g's
 //const double a_max_decel = 0.1; // TEST
 const double omega_max = 1.0; //1 rad/sec-> about 6 seconds to rotate 1 full rev
 const double alpha_max = 0.5; //0.5 rad/sec^2-> takes 2 sec to get from rest to full omega
@@ -91,8 +91,8 @@ int main(int argc, char **argv) {
     ros::NodeHandle nh; // get a ros nodehandle; standard yadda-yadda
     //create a publisher object that can talk to ROS and issue twist messages on named topic;
     // note: this is customized for stdr robot; would need to change the topic to talk to jinx, etc.
-    ros::Publisher vel_cmd_publisher = nh.advertise<geometry_msgs::Twist>("robot0/cmd_vel", 1);
-    ros::Subscriber sub = nh.subscribe("/robot0/odom", 1, odomCallback);
+    ros::Publisher vel_cmd_publisher = nh.advertise<geometry_msgs::Twist>("request_vel", 1);
+    ros::Subscriber sub = nh.subscribe("/odom", 1, odomCallback);
     ros::Rate rtimer(1 / DT); // frequency corresponding to chosen sample period DT; the main loop will run this fast
 
     // here is a crude description of one segment of a journey.  Will want to generalize this to handle multiple segments
@@ -124,7 +124,7 @@ int main(int argc, char **argv) {
     odom_omega_ = 1000000; // absurdly high
     ROS_INFO("waiting for valid odom callback...");
     t_last_callback_ = ros::Time::now(); // initialize reference for computed update rate of callback
-    while (odom_omega_ > 1000) {
+    while (odom_omega_ > 1000 && ros::ok()) {
         rtimer.sleep();
         ros::spinOnce();
     }

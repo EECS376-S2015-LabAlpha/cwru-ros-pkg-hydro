@@ -86,7 +86,7 @@ int main(int argc, char **argv) {
     lidar_alarm_publisher_ = pub; // let's make this global, so callback can use it
     ros::Publisher pub2 = nh.advertise<std_msgs::Float32>("lidar_dist", 1);  
     lidar_dist_publisher_ = pub2;
-    ros::Subscriber lidar_subscriber = nh.subscribe("/laser_0", 1, laserCallback);
+    ros::Subscriber lidar_subscriber = nh.subscribe("/base_laser1_scan", 1, laserCallback);
     ros::spin(); //this is essentially a "while(1)" statement, except it
     // forces refreshing wakeups upon new data arrival
     // main program essentially hangs here, but it must stay alive to keep the callback function alive
