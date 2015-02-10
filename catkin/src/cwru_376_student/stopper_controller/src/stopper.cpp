@@ -31,7 +31,7 @@ void commandCB(const geometry_msgs::Twist& cmd) {
 		last_cmd.linear.x = std::max(0.0,last_vel-max_decel);
 		last_cmd.angular.z = 0.0;
 	}
-	else if(strcmp("STOP", input_status.c_str()) && false) {
+	else if(strcmp("STOP", input_status.c_str())) {
 		ROS_INFO("input stop");
 		// CLI stop requested
 		last_cmd.linear.x = std::max(0.0,last_vel-max_decel);
