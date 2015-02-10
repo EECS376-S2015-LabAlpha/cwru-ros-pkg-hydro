@@ -6,7 +6,17 @@ int main(int argc, char **argv)
 {
 	ros::init(argc,argv,"test_commander");
 	ros::NodeHandle nh;
-
+	ROS_INFO("argc %d", argc);
+	double vel = 0.5;
+	double t = 30;
+	if(argc >= 2) {
+		vel = atof(*(argv+1));
+		ROS_INFO("argv1 %f",vel);
+	}
+	if(argc >= 3) {
+		t = atof(*(argv+2));
+		ROS_INFO("argv2 %f",t);
+	}
 	ros::Publisher cmd_publisher = nh.advertise<geometry_msgs::Twist>("/cmd_vel",1);
 
 	ros::Rate sleep_timer(40);
@@ -28,9 +38,9 @@ int main(int argc, char **argv)
 	}
 	ROS_INFO("we have takeoff");
 
-	int niters = 1200;
+	int niters = (int) (40*t);
 
-	twist_cmd.linear.x = 0.5;
+	twist_cmd.linear.x = vel;
 
 	for (int i=0;i<niters && ros::ok();i++) {
 	    cmd_publisher.publish(twist_cmd);
