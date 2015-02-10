@@ -16,11 +16,8 @@ catkin_simple()
 
 # Executables
 cs_add_executable(robot_commander src/example_robot_commander.cpp)
-<<<<<<< HEAD
 cs_add_executable(test_commander src/test_commander.cpp)
-=======
 
->>>>>>> 6cb2c3fd56d625b6e82f8ee801d1a303e149abdf
 cs_add_executable(halt_commander src/halt_commander.cpp)
 #cs_add_executable(vel_scheduler src/vel_scheduler.cpp)
 cs_add_executable(vel_scheduler_jinx src/vel_scheduler_jinx.cpp)

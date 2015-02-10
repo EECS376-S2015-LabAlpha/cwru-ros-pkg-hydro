@@ -26,7 +26,7 @@ int main(int argc, char **argv)
 	    for (int i = 0; i<100;i++)
 	        sleep_timer.sleep();
 	}
-	ROS_INFO("we have takeoff")
+	ROS_INFO("we have takeoff");
 
 	int niters = 1200;
 
