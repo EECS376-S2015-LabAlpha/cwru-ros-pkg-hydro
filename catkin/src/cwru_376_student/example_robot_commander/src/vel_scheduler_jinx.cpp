@@ -36,7 +36,7 @@ therefore, theta = 2*atan2(qz,qw)
 
 
 // set some dynamic limits...
-const double v_max = 2.0; //1m/sec is a slow walk
+const double v_max = 1.5; //1m/sec is a slow walk
 const double v_min = 0.1; // if command velocity too low, robot won't move
 const double a_max = 0.5; //1m/sec^2 is 0.1 g's
 //const double a_max_decel = 0.1; // TEST
