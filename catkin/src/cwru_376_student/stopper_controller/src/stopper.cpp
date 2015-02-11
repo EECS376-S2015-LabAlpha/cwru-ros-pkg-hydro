@@ -46,7 +46,7 @@ void commandCB(const geometry_msgs::Twist& cmd) {
 		if (last_cmd.linear.x > .01 && last_cmd.linear.x < .11) { last_cmd.linear.x = .11; }
 		last_cmd.angular.z = cmd.angular.z;
 	}
-	//cmd_pub.publish(last_cmd);
+	cmd_pub.publish(last_cmd);
 	ROS_INFO("last_cmd %f", last_cmd.linear.x);
 
 }
@@ -74,15 +74,15 @@ int main(int argc, char **argv) {
 	cmd_pub = n.advertise<geometry_msgs::Twist>("/cmd_vel",1);
 
 	//subscribe to the current state of the e-stop
-	ros::Subscriber estop_sub = n.subscribe("motors_enabled",1,estopCB);
+	ros::Subscriber estop_sub = n.subscribe("/motors_enabled",1,estopCB);
 	//subscribe to requested velocity
-	ros::Subscriber cmd_sub = n.subscribe("request_vel",1,commandCB);
+	ros::Subscriber cmd_sub = n.subscribe("/request_vel",1,commandCB);
 	//subscribe to lidar stop output
-	ros::Subscriber lidar_sub = n.subscribe("lidar_alarm",1,lidarStopCB);
+	ros::Subscriber lidar_sub = n.subscribe("/lidar_alarm",1,lidarStopCB);
 	//subscribe to control strings from command line
-	ros::Subscriber cli_sub = n.subscribe("cmd_str",1,typeStopCB); 
+	ros::Subscriber cli_sub = n.subscribe("/cmd_str",1,typeStopCB); 
 	//subscribe to odom for proper slowdown on CLI, Lidar stops
-	ros::Subscriber odom_sub = n.subscribe("jinx/odom", 1, odomCB); //need to change for jinx
+	ros::Subscriber odom_sub = n.subscribe("/odom", 1, odomCB); //need to change for jinx
 
 	ros::spin();
 }

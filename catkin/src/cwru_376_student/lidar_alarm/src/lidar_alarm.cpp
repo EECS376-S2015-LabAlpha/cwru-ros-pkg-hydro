@@ -18,6 +18,8 @@ double range_min_ = 0.0;
 double range_max_ = 0.0;
 bool laser_alarm_=false;
 int error_alert = 0;
+std_msgs::Bool lidar_alarm_msg;
+
 
 ros::Publisher lidar_alarm_publisher_;
 ros::Publisher lidar_dist_publisher_;
@@ -25,6 +27,7 @@ ros::Publisher lidar_dist_publisher_;
 // to improve reliability and avoid false alarms or failure to see an obstacle
 
 void laserCallback(const sensor_msgs::LaserScan& laser_scan) {
+	error_alert = 0;
     if (ping_index_<0)  {
         //for first message received, set up the desired index of LIDAR range to eval
         angle_min_ = laser_scan.angle_min;
@@ -52,14 +55,18 @@ void laserCallback(const sensor_msgs::LaserScan& laser_scan) {
         if(error_alert > 2){
             ROS_INFO("STOP ping dist in front = %f on ping %d",laser_scan.ranges[i], i);
             laser_alarm_=true;
+			lidar_alarm_msg.data = true;
+			ROS_INFO("lidar true");
+			lidar_alarm_publisher_.publish(lidar_alarm_msg);
+			return;
         }
         else error_alert++;
     }
-    else {
-        if(error_alert != 0)
-            error_alert--;
-        laser_alarm_=false;
+
     }
+    if (error_alert <=2) {
+        ROS_INFO("laser false");
+        laser_alarm_=false;
     }
    /*ping_dist_in_front_ = laser_scan.ranges[ping_index_];
    ROS_INFO("ping dist in front = %f",ping_dist_in_front_);
@@ -70,8 +77,9 @@ void laserCallback(const sensor_msgs::LaserScan& laser_scan) {
    else {
        laser_alarm_=false;
    }*/
-   std_msgs::Bool lidar_alarm_msg;
+ 
    lidar_alarm_msg.data = laser_alarm_;
+	ROS_INFO("lidar alarm %d", lidar_alarm_msg.data);
    lidar_alarm_publisher_.publish(lidar_alarm_msg);
    std_msgs::Float32 lidar_dist_msg;
    lidar_dist_msg.data = ping_dist_in_front_;
