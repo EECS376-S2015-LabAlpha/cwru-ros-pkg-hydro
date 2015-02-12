@@ -8,6 +8,7 @@ int main(int argc, char **argv)
 	ros::NodeHandle nh;
 	ROS_INFO("argc %d", argc);
 	double vel = 0.5;
+	double ang = 0.0;
 	double t = 30;
 	if(argc >= 2) {
 		vel = atof(*(argv+1));
@@ -16,6 +17,10 @@ int main(int argc, char **argv)
 	if(argc >= 3) {
 		t = atof(*(argv+2));
 		ROS_INFO("argv2 %f",t);
+	}
+	if(argc >= 4) {
+		ang = atof(*(argv+3));
+		ROS_INFO("argv3 %f", ang);
 	}
 	ros::Publisher cmd_publisher = nh.advertise<geometry_msgs::Twist>("/cmd_vel",1);
 
@@ -41,6 +46,7 @@ int main(int argc, char **argv)
 	int niters = (int) (40*t);
 
 	twist_cmd.linear.x = vel;
+	twist_cmd.angular.z = ang;
 
 	for (int i=0;i<niters && ros::ok();i++) {
 	    cmd_publisher.publish(twist_cmd);
