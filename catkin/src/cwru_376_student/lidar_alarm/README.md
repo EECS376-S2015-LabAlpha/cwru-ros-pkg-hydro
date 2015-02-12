@@ -6,5 +6,11 @@ being the point directly in front); we can adjust this angle to sweep narrower (
 
 ## Example usage
 
+By subscribing to "lidar_alarm" one can listen for a bool representing wheather the safe zone has been breached as follows:
+
+ros::Subscriber lidar_sub = n.subscribe("/lidar_alarm",1,callback);
+
+where std_msgs::Bool& msg would be input parameter as a bool
+
 ## Running tests/demos
     

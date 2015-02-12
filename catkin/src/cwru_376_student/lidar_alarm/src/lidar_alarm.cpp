@@ -28,6 +28,7 @@ ros::Publisher lidar_dist_publisher_;
 
 void laserCallback(const sensor_msgs::LaserScan& laser_scan) {
 	error_alert = 0;
+    //Initiate values
     if (ping_index_<0)  {
         //for first message received, set up the desired index of LIDAR range to eval
         angle_min_ = laser_scan.angle_min;
@@ -46,12 +47,14 @@ void laserCallback(const sensor_msgs::LaserScan& laser_scan) {
         ROS_INFO("LIDAR setup: ping_index = %d",ping_index_);
         
     }
+    //bounds for the lidar pings we want
     double end_angle = angle_max_;
     double start_angle = angle_min_;
 
+    //Lets go from the start angle to the end angle and obtain all the pings in that range
     for(int i = (int)((0 - start_angle + angle_min_)/angle_increment_); i< (int) ((end_angle - start_angle)/angle_increment_); i++){
     if (laser_scan.ranges[i] < 1) {
-
+      //if we find that at least two of them are within the danger zone the alert
         if(error_alert > 2){
             ROS_INFO("STOP ping dist in front = %f on ping %d",laser_scan.ranges[i], i);
             laser_alarm_=true;
@@ -62,21 +65,13 @@ void laserCallback(const sensor_msgs::LaserScan& laser_scan) {
         }
         else error_alert++;
     }
-
-    }
-    if (error_alert <=2) {
+    //lets reset our buffer if its not within range
+    else {
+        error_alert = 0;
         ROS_INFO("laser false");
         laser_alarm_=false;
+        }
     }
-   /*ping_dist_in_front_ = laser_scan.ranges[ping_index_];
-   ROS_INFO("ping dist in front = %f",ping_dist_in_front_);
-   if (ping_dist_in_front_<MIN_SAFE_DISTANCE) {
-       ROS_WARN("DANGER, WILL ROBINSON!!");
-       laser_alarm_=true;
-   }
-   else {
-       laser_alarm_=false;
-   }*/
  
    lidar_alarm_msg.data = laser_alarm_;
 	ROS_INFO("lidar alarm %d", lidar_alarm_msg.data);
