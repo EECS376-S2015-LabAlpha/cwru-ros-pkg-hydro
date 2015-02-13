@@ -18,13 +18,49 @@ double range_min_ = 0.0;
 double range_max_ = 0.0;
 bool laser_alarm_=false;
 int error_alert = 0;
+
+//The width of our warn box, in meters
+double l1 = 1.5;
+//The length of our warn box, in meters
+double l2 = 1;
+
 std_msgs::Bool lidar_alarm_msg;
 
 
 ros::Publisher lidar_alarm_publisher_;
 ros::Publisher lidar_dist_publisher_;
-// really, do NOT want to depend on a single ping.  Should consider a subset of pings
-// to improve reliability and avoid false alarms or failure to see an obstacle
+
+//Used to calculate if a certain ping falls within the designated box of width and length
+bool ping_within_box_range(double angle_min, int angle_increment_,int i,double scan_distance, double width,double length){
+    //tan(theta)=opp/adj
+    //atan2(opp/adj) = theta... ok so now we have a postive theta. 
+    double angle_from_normal = atan2(length,(width/2));
+
+    //make theta neg and subtract the small portion below -90 degrees. We want this to the negative
+    double left_critical_angle = (angle_min + 90)-angle_from_normal;
+
+    //likewise for the right side, subtracting from the whole right part this time. This is positive
+    double right_critical_angle = 90 - angle_from_normal;
+
+    //angle from the -90 point
+    double theta_normal = (angle_increment_*i)+(angle_min + 90);
+
+    //raw ablge
+    double raw_angle = angle_increment_*i + angle_min;
+
+    //Check behind the lidar
+    if((raw_angle < -90) || (raw_angle > 90)){
+        return scan_distance < ((width/2)/cos(std::abs((int)theta_normal % 180)));
+    }
+    //On the sides in the front
+    else if((angle_increment_*i + angle_min < left_critical_angle) || (angle_increment_*i + angle_min > right_critical_angle)){
+        return scan_distance < ((width/2)/sin(90 - theta_normal));
+    }
+    //Directly in front
+    else{
+        return scan_distance < (length/sin(theta_normal));
+    }
+}
 
 void laserCallback(const sensor_msgs::LaserScan& laser_scan) {
 	error_alert = 0;
@@ -48,12 +84,12 @@ void laserCallback(const sensor_msgs::LaserScan& laser_scan) {
         
     }
     //bounds for the lidar pings we want
-    double end_angle = angle_max_;
-    double start_angle = angle_min_;
+    //double end_angle = angle_max_;
+    //double start_angle = angle_min_;
 
     //Lets go from the start angle to the end angle and obtain all the pings in that range
-    for(int i = (int)((0 - start_angle + angle_min_)/angle_increment_); i< (int) ((end_angle - start_angle)/angle_increment_); i++){
-    if (laser_scan.ranges[i] < 1) {
+    for(int i = (int)(angle_min_); i< (int) (angle_max_); i++){
+    if (ping_within_box_range(angle_min_,angle_increment_,i,laser_scan.ranges[i],l1,l2)) {
       //if we find that at least two of them are within the danger zone the alert
         if(error_alert > 2){
             ROS_INFO("STOP ping dist in front = %f on ping %d",laser_scan.ranges[i], i);
