@@ -78,7 +78,7 @@ void laserCallback(const sensor_msgs::LaserScan& laser_scan) {
     ROS_INFO("range min is: %f, range max is: %f", range_min_, range_max_);
 
     //Lets go from the start angle to the end angle and obtain all the pings in that range
-    for(int i = 0; i< (int) ((-angle_min_+ angle_max_)/angle_increment_); i++){
+    for(int i = 0; i< (int) laser_scan.ranges.size(); i++){
         if (ping_within_box_range(angle_min_,angle_increment_,i,laser_scan.ranges[i],l1,l2)) {
           //if we find that at least two of them are within the danger zone the alert
             if(error_alert > 2){
