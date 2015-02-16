@@ -19,12 +19,58 @@ double range_max_ = 0.0;
 bool laser_alarm_=false;
 int error_alert = 0;
 
+//The width of our warn box, in meters
+double l1 = 1.5;
+//The length of our warn box, in meters
+double l2 = 1;
+
+std_msgs::Bool lidar_alarm_msg;
+
 ros::Publisher lidar_alarm_publisher_;
 ros::Publisher lidar_dist_publisher_;
 // really, do NOT want to depend on a single ping.  Should consider a subset of pings
 // to improve reliability and avoid false alarms or failure to see an obstacle
 
+bool ping_within_box_range(double angle_min, int angle_increment_,int i,double scan_distance, double width,double length){
+    //tan(theta)=opp/adj
+    //atan2(opp/adj) = theta... ok so now we have a postive theta. 
+    double angle_from_normal = atan2(length,(width/2));
+
+    //make theta neg and subtract the small portion below -90 degrees. We want this to the negative
+    double left_critical_angle = (angle_min + 90)-angle_from_normal;
+
+    //likewise for the right side, subtracting from the whole right part this time. This is positive
+    double right_critical_angle = 90 - angle_from_normal;
+
+    //angle from the -90 point
+    double theta_normal = (angle_increment_*i)+(angle_min + 90);
+
+    //raw ablge
+    double raw_angle = angle_increment_*i + angle_min;
+
+    //Check behind the lidar
+    if((raw_angle < -90) || (raw_angle > 90)){
+        double scan_distance_calc = ((width/2)/cos(std::abs((int)theta_normal % 180)));
+        ROS_INFO("behind the lidar, max dist is: %f", scan_distance_calc);
+        return scan_distance < ((width/2)/cos(std::abs((int)theta_normal % 180)));
+    }
+    //On the sides in the front
+    else if((angle_increment_*i + angle_min < left_critical_angle) || (angle_increment_*i + angle_min > right_critical_angle)){
+      double scan_distance_calc = (width/2)/sin(90 - theta_normal);
+        ROS_INFO("sides in the front, max dist is: %f", scan_distance_calc);
+        return scan_distance < ((width/2)/sin(90 - theta_normal));
+    }
+    //Directly in front
+    else{
+      double scan_distance_calc = (length/sin(theta_normal));
+        ROS_INFO("Directly in front, max dist is: %f", scan_distance_calc);
+        return scan_distance < (length/sin(theta_normal));
+    }
+}
+
 void laserCallback(const sensor_msgs::LaserScan& laser_scan) {
+    error_alert = 0;
+    //Initiate values
     if (ping_index_<0)  {
         //for first message received, set up the desired index of LIDAR range to eval
         angle_min_ = laser_scan.angle_min;
@@ -43,39 +89,38 @@ void laserCallback(const sensor_msgs::LaserScan& laser_scan) {
         ROS_INFO("LIDAR setup: ping_index = %d",ping_index_);
         
     }
-    double end_angle = angle_max_;
-    double start_angle = angle_min_;
+    //bounds for the lidar pings we want
+    //double end_angle = angle_max_;
+    //double start_angle = angle_min_;
 
-    for(int i = (int)((0 - start_angle + angle_min_)/angle_increment_); i< (int) ((end_angle - start_angle)/angle_increment_); i++){
-    if (laser_scan.ranges[i] < 1) {
-
+    //Lets go from the start angle to the end angle and obtain all the pings in that range
+    for(int i = (int)(angle_min_); i< (int) (angle_max_); i++){
+    if (ping_within_box_range(angle_min_,angle_increment_,i,laser_scan.ranges[i],l1,l2)) {
+      //if we find that at least two of them are within the danger zone the alert
         if(error_alert > 2){
             ROS_INFO("STOP ping dist in front = %f on ping %d",laser_scan.ranges[i], i);
             laser_alarm_=true;
+      lidar_alarm_msg.data = true;
+      ROS_INFO("lidar true");
+      lidar_alarm_publisher_.publish(lidar_alarm_msg);
+      return;
         }
         else error_alert++;
     }
+    //lets reset our buffer if its not within range
     else {
-        if(error_alert != 0)
-            error_alert--;
+        error_alert = 0;
+        ROS_INFO("laser false");
         laser_alarm_=false;
+        }
     }
-    }
-   /*ping_dist_in_front_ = laser_scan.ranges[ping_index_];
-   ROS_INFO("ping dist in front = %f",ping_dist_in_front_);
-   if (ping_dist_in_front_<MIN_SAFE_DISTANCE) {
-       ROS_WARN("DANGER, WILL ROBINSON!!");
-       laser_alarm_=true;
-   }
-   else {
-       laser_alarm_=false;
-   }*/
-   std_msgs::Bool lidar_alarm_msg;
+ 
    lidar_alarm_msg.data = laser_alarm_;
+  ROS_INFO("lidar alarm %d", lidar_alarm_msg.data);
    lidar_alarm_publisher_.publish(lidar_alarm_msg);
    std_msgs::Float32 lidar_dist_msg;
    lidar_dist_msg.data = ping_dist_in_front_;
-   lidar_dist_publisher_.publish(lidar_dist_msg);   
+   lidar_dist_publisher_.publish(lidar_dist_msg); 
 }
 
 int main(int argc, char **argv) {

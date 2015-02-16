@@ -50,14 +50,17 @@ bool ping_within_box_range(double angle_min, int angle_increment_,int i,double s
 
     //Check behind the lidar
     if((raw_angle < -90) || (raw_angle > 90)){
+        ROS_INFO("behind the lidar, max dist is: %d", ((width/2)/cos(std::abs((int)theta_normal % 180))));
         return scan_distance < ((width/2)/cos(std::abs((int)theta_normal % 180)));
     }
     //On the sides in the front
     else if((angle_increment_*i + angle_min < left_critical_angle) || (angle_increment_*i + angle_min > right_critical_angle)){
+        ROS_INFO("sides in the front, max dist is: %d", (width/2)/sin(90 - theta_normal));
         return scan_distance < ((width/2)/sin(90 - theta_normal));
     }
     //Directly in front
     else{
+        ROS_INFO("Directly in front, max dist is: %d", (length/sin(theta_normal)));
         return scan_distance < (length/sin(theta_normal));
     }
 }
@@ -126,6 +129,7 @@ int main(int argc, char **argv) {
     ros::Publisher pub2 = nh.advertise<std_msgs::Float32>("lidar_dist", 1);  
     lidar_dist_publisher_ = pub2;
     ros::Subscriber lidar_subscriber = nh.subscribe("/base_laser1_scan", 1, laserCallback);
+    ROS_INFO("lidar alarm started");
     ros::spin(); //this is essentially a "while(1)" statement, except it
     // forces refreshing wakeups upon new data arrival
     // main program essentially hangs here, but it must stay alive to keep the callback function alive
