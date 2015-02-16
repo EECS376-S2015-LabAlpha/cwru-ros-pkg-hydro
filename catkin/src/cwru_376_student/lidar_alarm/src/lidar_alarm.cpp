@@ -28,7 +28,10 @@ ros::Publisher lidar_dist_publisher_;
 
 //Used to calculate if a certain ping falls within the designated box of width and length
 bool ping_within_box_range(double angle_min, int angle_increment_,int i,double scan_distance, double width,double length){
-    //tan(theta)=opp/adj
+    //Lets change to degrees
+    angle_min = angle_min * 180 / 3.14159;
+    angle_increment_ = angle_increment_ * 180 / 3.14159;
+
     //atan2(opp/adj) = theta... ok so now we have a postive theta. 
     double angle_from_normal = atan2(length,(width/2));
 
