@@ -11,11 +11,7 @@ const double MIN_SAFE_DISTANCE = 0.5; // set alarm if anything is within 0.5m of
 // these values to be set within the laser callback
 float ping_dist_in_front_=3.0; // global var to hold length of a SINGLE LIDAR ping--in front
 int ping_index_= -1; // NOT real; callback will have to find this
-double angle_min_=0.0;
-double angle_max_=0.0;
-double angle_increment_=0.0;
-double range_min_ = 0.0;
-double range_max_ = 0.0;
+
 bool laser_alarm_=false;
 int error_alert = 0;
 
@@ -68,48 +64,36 @@ bool ping_within_box_range(double angle_min, int angle_increment_,int i,double s
 void laserCallback(const sensor_msgs::LaserScan& laser_scan) {
 	error_alert = 0;
     //Initiate values
-    if (ping_index_<0)  {
-        //for first message received, set up the desired index of LIDAR range to eval
-        angle_min_ = laser_scan.angle_min;
-        angle_max_ = laser_scan.angle_max;
-    ROS_INFO("angle min is: %f", angle_min_);
-    ROS_INFO("angle max is: %f", angle_max_);
-        angle_increment_ = laser_scan.angle_increment;
-    ROS_INFO("angle increment is: %f", angle_increment_);
-        range_min_ = laser_scan.range_min;
-        range_max_ = laser_scan.range_max;
+    //for first message received, set up the desired index of LIDAR range to eval
+    double angle_min_ = laser_scan.angle_min;
+    double angle_max_ = laser_scan.angle_max;
+    double angle_increment_ = laser_scan.angle_increment;
+    double range_min_ = laser_scan.range_min;
+    double range_max_ = laser_scan.range_max;
+
+    ROS_INFO("angle min is: %f, angle max is: %f, angle increment is: %f", angle_min_, angle_max_,angle_increment_);  
     ROS_INFO("range min is: %f, range max is: %f", range_min_, range_max_);
-        // what is the index of the ping that is straight ahead?
-        // BETTER would be to use transforms, which would reference how the LIDAR is mounted;
-        // but this will do for simple illustration
-        //ping_index_ = (int) (0.0 -angle_min_)/angle_increment_;
-        ROS_INFO("LIDAR setup: ping_index = %d",ping_index_);
-        
-    }
-    //bounds for the lidar pings we want
-    //double end_angle = angle_max_;
-    //double start_angle = angle_min_;
 
     //Lets go from the start angle to the end angle and obtain all the pings in that range
-    for(int i = (int)(angle_min_); i< (int) (angle_max_); i++){
-    if (ping_within_box_range(angle_min_,angle_increment_,i,laser_scan.ranges[i],l1,l2)) {
-      //if we find that at least two of them are within the danger zone the alert
-        if(error_alert > 2){
-            ROS_INFO("STOP ping dist in front = %f on ping %d",laser_scan.ranges[i], i);
-            laser_alarm_=true;
-			lidar_alarm_msg.data = true;
-			ROS_INFO("lidar true");
-			lidar_alarm_publisher_.publish(lidar_alarm_msg);
-			return;
+    for(int i = 0; i< (int) ((-angle_min_+ angle_max_)/angle_increment_); i++){
+        if (ping_within_box_range(angle_min_,angle_increment_,i,laser_scan.ranges[i],l1,l2)) {
+          //if we find that at least two of them are within the danger zone the alert
+            if(error_alert > 2){
+                ROS_INFO("STOP ping dist in front = %f on ping %d",laser_scan.ranges[i], i);
+                ROS_INFO("lidar true");
+                laser_alarm_=true;
+    			lidar_alarm_msg.data = true;
+    			lidar_alarm_publisher_.publish(lidar_alarm_msg);
+    			return;
+            }
+            else error_alert++;
         }
-        else error_alert++;
-    }
-    //lets reset our buffer if its not within range
-    else {
-        error_alert = 0;
-        ROS_INFO("laser false");
-        laser_alarm_=false;
-        }
+        //lets reset our buffer if its not within range
+        else {
+            error_alert = 0;
+            ROS_INFO("laser false");
+            laser_alarm_=false;
+            }
     }
  
    lidar_alarm_msg.data = laser_alarm_;
@@ -129,7 +113,6 @@ int main(int argc, char **argv) {
     ros::Publisher pub2 = nh.advertise<std_msgs::Float32>("lidar_dist", 1);  
     lidar_dist_publisher_ = pub2;
     ros::Subscriber lidar_subscriber = nh.subscribe("/base_laser1_scan", 1, laserCallback);
-    ROS_INFO("lidar alarm started");
     ros::spin(); //this is essentially a "while(1)" statement, except it
     // forces refreshing wakeups upon new data arrival
     // main program essentially hangs here, but it must stay alive to keep the callback function alive
