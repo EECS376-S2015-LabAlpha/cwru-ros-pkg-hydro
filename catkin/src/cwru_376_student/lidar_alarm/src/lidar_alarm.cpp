@@ -47,19 +47,21 @@ bool ping_within_box_range(double angle_min, int angle_increment_,int i,double s
     //raw ablge
     double raw_angle = angle_increment_*i + angle_min;
 
+    ROS_INFO("index #: %d at %f ",i,scan_distance);
+    
     //Check behind the lidar
     if((raw_angle < -90) || (raw_angle > 90)){
-        ROS_INFO("behind the lidar, max dist is: %d", ((width/2)/cos(std::abs((int)theta_normal % 180))));
+        ROS_INFO("behind the lidar, max dist is: %f", (double)((width/2)/cos(std::abs((int)theta_normal % 180))));
         return scan_distance < ((width/2)/cos(std::abs((int)theta_normal % 180)));
     }
     //On the sides in the front
     else if((angle_increment_*i + angle_min < left_critical_angle) || (angle_increment_*i + angle_min > right_critical_angle)){
-        ROS_INFO("sides in the front, max dist is: %d", (width/2)/sin(90 - theta_normal));
+        ROS_INFO("sides in the front, max dist is: %f", (double)(width/2)/sin(90 - theta_normal));
         return scan_distance < ((width/2)/sin(90 - theta_normal));
     }
     //Directly in front
     else{
-        ROS_INFO("Directly in front, max dist is: %d", (length/sin(theta_normal)));
+        ROS_INFO("Directly in front, max dist is: %f", (double)(length/sin(theta_normal)));
         return scan_distance < (length/sin(theta_normal));
     }
 }
