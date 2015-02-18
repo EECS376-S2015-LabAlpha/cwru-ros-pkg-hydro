@@ -18,4 +18,9 @@ Can also observe the speed commands by plotting using:
 rqt_plot /robot0/cmd_vel/linear/x
 
 
+The robot_controller_jinx file is basically a copy of vel_scheduler, but modified to publish to jinx.
+In addition, turning and horizontal speeds are reduced for jinx, and turning times are a little bit longer
+because of the robot's inertial and floor friction. 
+
+
     
