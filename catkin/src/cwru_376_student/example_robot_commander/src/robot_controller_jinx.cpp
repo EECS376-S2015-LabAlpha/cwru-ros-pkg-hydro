@@ -90,7 +90,7 @@ for (int i = 0; i < niters; i++) {
 //Now rotate right again to face the vending machines
 twist_cmd.linear.x = 0.0;
 twist_cmd.angular.z = -0.314;
-niters=500; // 5 sec
+niters=480; // 5 sec
 ROS_INFO("Time to rotate negative (again)!");
 for (int i=0;i<niters;i++) {
     cmd_publisher.publish(twist_cmd); // really, should only need to publish this once, but no hard done
