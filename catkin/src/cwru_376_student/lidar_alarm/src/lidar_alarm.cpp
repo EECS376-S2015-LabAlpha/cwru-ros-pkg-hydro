@@ -47,7 +47,7 @@ bool ping_within_box_range(double angle_min, int angle_increment_,int i,double s
     //raw ablge
     double raw_angle = angle_increment_*i + angle_min;
 
-    ROS_INFO("index #: %d at %d ",i,scan_distance);
+    ROS_INFO("index #: %d at %f ",i,scan_distance);
     
     //Check behind the lidar
     if((raw_angle < -90) || (raw_angle > 90)){
