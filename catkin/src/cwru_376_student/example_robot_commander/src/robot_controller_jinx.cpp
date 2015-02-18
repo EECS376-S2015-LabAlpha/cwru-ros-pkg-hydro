@@ -7,7 +7,7 @@ ros::NodeHandle nh; // two lines to create a publisher object that can talk to R
 //stdr "robot0" is expecting to receive commands on topic: /robot0/cmd_vel
 // commands are of type geometry_msgs/Twist, but they use only velocity in x dir and
 //  yaw rate in z-dir; other 4 fields will be ignored
-ros::Publisher cmd_publisher = nh.advertise<geometry_msgs::Twist>("/cmd_vel",1);
+ros::Publisher cmd_publisher = nh.advertise<geometry_msgs::Twist>("/request_vel",1);
 
 // change topic to command abby...
 //ros::Publisher cmd_publisher = nh.advertise<geometry_msgs::Twist>("abby/cmd_vel",1);
@@ -90,7 +90,7 @@ for (int i = 0; i < niters; i++) {
 //Now rotate right again to face the vending machines
 twist_cmd.linear.x = 0.0;
 twist_cmd.angular.z = -0.314;
-niters=500; // 5 sec
+niters=480; // 5 sec
 ROS_INFO("Time to rotate negative (again)!");
 for (int i=0;i<niters;i++) {
     cmd_publisher.publish(twist_cmd); // really, should only need to publish this once, but no hard done
