@@ -7,6 +7,8 @@ ros::NodeHandle nh; // two lines to create a publisher object that can talk to R
 //stdr "robot0" is expecting to receive commands on topic: /robot0/cmd_vel
 // commands are of type geometry_msgs/Twist, but they use only velocity in x dir and
 //  yaw rate in z-dir; other 4 fields will be ignored
+
+//Publish to stopper_controller, on topic request_vel
 ros::Publisher cmd_publisher = nh.advertise<geometry_msgs::Twist>("request_vel",1);
 
 // change topic to command abby...
@@ -38,27 +40,25 @@ for (int j=3;j>0 && ros::ok();j--) {
         sleep_timer.sleep();
 }
 
-int niters = 1200; //1000 iters at 100Hz is 10 seconds;
-//iteration counter; at 10ms/iteration, and 0.2m/sec, expect 2mm/iter
-// should move by 2m over 10 sec
+int niters = 1200; //1200 iters at 100Hz is 12 seconds;
+
 for (int i=0;i<niters && ros::ok();i++) {
     cmd_publisher.publish(twist_cmd); // really, should only need to publish this once, but no hard done
     sleep_timer.sleep(); // sleep for (remainder of) 10m
 }
+
+//Now set the angular speed to turn in the negative direction (approx 90 degrees)
 twist_cmd.linear.x = 0.0;
 twist_cmd.angular.z = -0.157;
-niters=1080; // 5 sec
+niters=1080; // 10.8 sec
 ROS_INFO("Time to rotate negative");
 for (int i=0;i<niters && ros::ok();i++) {
     cmd_publisher.publish(twist_cmd); // really, should only need to publish this once, but no hard done
     sleep_timer.sleep(); // sleep for (remainder of) 10m
 }
-//twist_cmd.linear.x = 0.0;
-//twist_cmd.angular.z = 0;
-//cmd_publisher.publish(twist_cmd); // and halt
-//}
 
-//Now move forward for 15.5 seconds at 0.8 m/s to get down to the hall
+
+//Now move forward for 31 seconds at 0.4 m/s to get down to the hall
 twist_cmd.angular.z = 0.0;
 twist_cmd.linear.x = 0.4;
 niters = 3100;
