@@ -1,7 +1,14 @@
 cmake_minimum_required(VERSION 2.8.3)
 project(lidar_space_detection)
 
-find_package(catkin_simple REQUIRED)
+find_package(catkin_simple REQUIRED COMPONENTS
+  roscpp
+  tf
+  geometry_msgs
+  message_generation
+  nav_msgs
+  std_msgs
+)
 
 catkin_simple()
 
@@ -15,7 +22,7 @@ catkin_simple()
 # cs_add_libraries(my_lib src/my_lib.cpp)   
 
 # Executables
-# cs_add_executable(example src/example.cpp)
+cs_add_executable(lidar_space_detection src/lidar_space.cpp)
 # target_link_library(example my_lib)
 
 cs_install()
