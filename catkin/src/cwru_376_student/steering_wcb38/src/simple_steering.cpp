@@ -226,7 +226,7 @@ void SteeringController::my_clever_steering_algorithm() {
     // omega_odom + omega_cmd = (theta_desired) * (2 * UPDATE_RATE)
     // omega_cmd = (theta_desired*2*UPDATE_RATE) - omega_odom
 
-    double speed_correction = (-0.5)*atan(trip_dist_error);
+    double speed_correction = (-0.5)*atan(trip_dist_err);
 
     // now we have corrections
     controller_speed = std::max(std::min(1.1*MAX_SPEED, des_state_vel_+speed_correction), 0.0);
