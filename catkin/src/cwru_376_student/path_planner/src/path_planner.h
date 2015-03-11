@@ -23,7 +23,8 @@ const bool DEBUG_MODE=false; // change this for display/break-points
 #include <geometry_msgs/PointStamped.h>
 #include <geometry_msgs/PoseStamped.h>
 #include <nav_msgs/Odometry.h>
-
+#include <lidar_space_detection/LidarSpace.h>
+#include <lidar_space_detection/LidarSpaceSlice.h>
 
 #include <ros/ros.h> //ALWAYS need to include this
 
@@ -103,6 +104,7 @@ private:
     ros::NodeHandle nh_; // we will need this, to pass between "main" and constructor
     // some objects to support subscriber, service, and publisher
     ros::Subscriber odom_subscriber_; //these will be set up within the class constructor, hiding these ugly details
+    ros::Subscriber lidar_subscriber_;
     ros::ServiceServer append_path_; // service to receive a path message and append the poses to a queue of poses
     ros::ServiceServer flush_path_; //service to clear out the current queue of path points
     ros::Publisher des_state_publisher_; // we will publish desired states using this object   
@@ -125,6 +127,15 @@ private:
     double odom_y_;
     double odom_phi_;
     geometry_msgs::Quaternion odom_quat_;
+
+    //Values from the lidar scan, will get filled in by lidar callback
+    lidar_space_detection::LidarSpace currentScan;
+    lidar_space_detection::LidarSpaceSlice lidarSlices[];
+    geometry_msgs::Vector3 lidarSpaces[];
+    double distIncrement;
+    double lidarX;
+    double lidarY;
+    double lidarZ;
 
     //path description values:  these are all with respect to odom coordinates
     // these values get set once upon construction of the current path segment:
@@ -158,7 +169,9 @@ private:
 
     //prototypes for subscription callbacks
     void odomCallback(const nav_msgs::Odometry& odom_rcvd);
-    
+    void lidarCallback(const lidar_space_detection::LidarSpace& lidar_rcvd);
+
+
     //prototypes for service callbacks 
     bool flushPathCallback(cwru_srv::simple_bool_service_messageRequest& request, cwru_srv::simple_bool_service_messageResponse& response);
     bool appendPathCallback(cwru_srv::path_service_messageRequest& request, cwru_srv::path_service_messageResponse& response);
