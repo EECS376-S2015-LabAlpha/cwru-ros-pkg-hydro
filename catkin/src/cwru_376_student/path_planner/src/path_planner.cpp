@@ -11,6 +11,8 @@
 // this header incorporates all the necessary #include files and defines the class "DesStateGenerator"
 #include <geometry_msgs/Pose.h>
 #include <cwru_msgs/PathSegment.h>
+//#include <lidar_space_detection/LidarSpace.h>
+
 
 #include "path_planner.h"
 int ans;
@@ -92,6 +94,7 @@ DesStateGenerator::DesStateGenerator(ros::NodeHandle* nodehandle) : nh_(*nodehan
 void DesStateGenerator::initializeSubscribers() {
     ROS_INFO("Initializing Subscribers");
     odom_subscriber_ = nh_.subscribe("/odom", 1, &DesStateGenerator::odomCallback, this); //subscribe to odom messages
+    lidar_subscriber_ = nh_.subscribe("/LidarSpace", 1, &DesStateGenerator::lidarCallback, this);
     // add more subscribers here, as needed
 }
 
@@ -132,6 +135,20 @@ void DesStateGenerator::odomCallback(const nav_msgs::Odometry& odom_rcvd) {
     odom_quat_ = odom_rcvd.pose.pose.orientation;
     //odom publishes orientation as a quaternion.  Convert this to a simple heading
     odom_phi_ = convertPlanarQuat2Phi(odom_quat_); // cheap conversion from quaternion to heading for planar motion
+}
+
+void DesStateGenerator::lidarCallback(const lidar_space_detection::LidarSpace& lidar_rcvd) {
+    //Copy the lidar scan data into variables
+    //We need to extract information about possible directions we can go
+    currentScan = lidar_rcvd; ///Save the entire message
+    int i = 0;
+    //Copy over each lidar slice into an array: lidarSlices[]
+    for(lidar_space_detection::LidarSpaceSlice slice: lidar_rcvd.ranges) {
+        lidarSlices[i] = slice;
+        i++;
+    }
+    distIncrement = lidar_rcvd.dist_increment;
+
 }
 
 //member function implementation for a service callback function
@@ -292,7 +309,47 @@ void DesStateGenerator::process_new_vertex() {
     //start_pose_wrt_odom =  des_state_.pose.pose;   
        
     std::vector<cwru_msgs::PathSegment> vec_of_path_segs; // container for path segments to be built
-   
+    
+
+    geometry_msgs::Vector3 bestVec = lidarSpaces[0]; //Initialize the largest-gap vector to the first one
+
+    //Before we build the path segments, we have to check the lidar data to make sure nothing is in the way:
+    //Calculate the size of the lidarSlices array: by iterating through the lidarSpaces array and incrementing a counter
+    int numSlices = 0;
+    bool foundObstacle = false; //A boolean that will help "break" out of the outer for-loop as soon as we find an obstacle
+    for (lidar_space_detection::LidarSpaceSlice dummySlice : lidarSlices) {
+        numSlices++;
+    }
+
+    //Now iterate over the slices 
+    for (int i = 0; i < numSlices && !foundObstacle; i++) {
+        //For each slice, populate an array of vector3 objects 
+        int j = 0;
+        for (geometry_msgs::Vector3 vec : lidarSlices[i].spaces) {
+            lidarSpaces[j++] = vec;
+        }
+        //Check if there's more than one vector3 for this slice, this will mean that there is an obstacle and that 
+        //lidar pings were split into multiple ones
+        if (j > 1) {
+            //Iterate through the lidarSpaces array and find the vector3 with the largest gap (z component)
+            foundObstacle = true;
+            for (geometry_msgs::Vector3 dummyVec : lidarSpaces) {
+                if (dummyVec.z > bestVec.z) //If we find a vector with a larger gap than the currently-best one, then replace the current one
+                    bestVec = dummyVec;
+            }
+        }
+        
+    }
+
+    //At this point, we either found an obstacle, and have a bestVec that indicates where we should go, or there is no
+    //obstacle, and we should just continue with the old path
+    if (foundObstacle) {
+        //Add code here to convert Buck's vector3 into and odom pose
+    }
+
+
+
+
     // the following will construct two path segments: spin to reorient, then lineseg to reach goal point
     vec_of_path_segs = build_spin_then_line_path_segments(start_pose_wrt_odom, goal_pose_wrt_odom.pose);
 
