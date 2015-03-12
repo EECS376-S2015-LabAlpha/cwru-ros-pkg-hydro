@@ -345,22 +345,41 @@ void DesStateGenerator::process_new_vertex() {
     //obstacle, and we should just continue with the old path
     if (foundObstacle) {
         //Add code here to convert Buck's vector3 into and odom pose
+        geometry_msgs::Pose adjustedPose;
+        adjustedPose.position.z = start_pose_wrt_odom.position.z;
+        adjustedPose.position.y = start_pose_wrt_odom.position.y + (bestVec.x * cos(bestVec.y));
+        adjustedPose.position.y = start_pose_wrt_odom.position.x + (bestVec.x * sin(bestVec.y));
+        adjustedPose.orientation = start_pose_wrt_odom.orientation;
+        //First, add in an intermediate pose that will tell the robot to avoid the obstacle by moving to the side of the obstacle
+        vec_of_path_segs = build_spin_then_line_path_segments(start_pose_wrt_odom, adjustedPose);
+        for (int i=0;i<vec_of_path_segs.size();i++) {
+            segment_queue_.push(vec_of_path_segs[i]);
+        }
+        //Then, we can go from the intermediate pose to the goal pose (assuming there's only one obstacle and it's a cylindrical shape)
+        vec_of_path_segs = build_spin_then_line_path_segments(adjustedPose, goal_pose_wrt_odom.pose);
+        for (int i=0;i<vec_of_path_segs.size();i++) {
+            segment_queue_.push(vec_of_path_segs[i]);
+        }
     }
-
-
-
-
-    // the following will construct two path segments: spin to reorient, then lineseg to reach goal point
-    vec_of_path_segs = build_spin_then_line_path_segments(start_pose_wrt_odom, goal_pose_wrt_odom.pose);
+    //Otherwise, we just continue on the straight path from start_pose to goal_pose
+    else {
+        // the following will construct two path segments: spin to reorient, then lineseg to reach goal point
+        vec_of_path_segs = build_spin_then_line_path_segments(start_pose_wrt_odom, goal_pose_wrt_odom.pose);
 
     // more generally, could replace the above with a segment builder that included circular arcs, etc,
     // potentially generating more path segments in the list.  
     // Or more simply, could add a segpath builder that ONLY re-orients, yielding a single path seg
     // regardless, take however many resulting path segments and push them into a pathseg queue:
-    for (int i=0;i<vec_of_path_segs.size();i++) {
-        segment_queue_.push(vec_of_path_segs[i]);
+        for (int i=0;i<vec_of_path_segs.size();i++) {
+            segment_queue_.push(vec_of_path_segs[i]);
+        }
+    // we have now updated the segment queue; these segments should get processed before they get "stale"
     }
-   // we have now updated the segment queue; these segments should get processed before they get "stale"
+
+
+
+    
+   
 }
 
 
