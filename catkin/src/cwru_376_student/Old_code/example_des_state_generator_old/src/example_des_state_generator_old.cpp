@@ -12,10 +12,8 @@
 #include <geometry_msgs/Pose.h>
 #include <cwru_msgs/PathSegment.h>
 
-#include "des_state_generator.h"
+#include "example_des_state_generator_old.h"
 int ans;
-//double dist_len_accel = 0.5 * (MAX_SPEED * MAX_SPEED) / MAX_ACCEL; //Vinit^2 = Vfinal^2 + 2 a d
-//double dist_omg_accel = 0.5 * (MAX_OMEGA * MAX_OMEGA) / MAX_ALPHA;
 
 //CONSTRUCTOR:  this will get called whenever an instance of this class is created
 // want to put all dirty work of initializations here
@@ -371,7 +369,6 @@ cwru_msgs::PathSegment DesStateGenerator::build_line_segment(Eigen::Vector2d v1,
         return  line_path_segment;
 }
 
-
 // this function takes a path_segment object and fills in member variables, for
 //  iterative re-use by "update_des_state"
 void DesStateGenerator::unpack_next_path_segment() {   
@@ -523,6 +520,8 @@ nav_msgs::Odometry DesStateGenerator::update_des_state_lineseg() {
     return desired_state; 
 }
 
+
+
 nav_msgs::Odometry DesStateGenerator::update_des_state_spin() {
     nav_msgs::Odometry desired_state; // fill in this message and return it
     // need to update these values:
@@ -555,7 +554,7 @@ nav_msgs::Odometry DesStateGenerator::update_des_state_spin() {
     }
     
     // fill in components of desired-state message:
-    desired_state.twist.twist.linear.x = current_speed_des_;
+    desired_state.twist.twist.linear.x =current_speed_des_;
     desired_state.twist.twist.angular.z = current_omega_des_;
     desired_state.pose.pose.position.x = current_seg_xy_des_(0);
     desired_state.pose.pose.position.y = current_seg_xy_des_(1);
@@ -580,105 +579,18 @@ nav_msgs::Odometry DesStateGenerator::update_des_state_halt() {
     return desired_state;         
 }
 
-double DesStateGenerator::compare_to_scheduled_vel(double odom_vel,double scheduled_vel,double a_max){
-    double new_cmd_vel;
-    if (odom_vel < scheduled_vel) {  // maybe we halted, e.g. due to estop or obstacle;
-        // may need to ramp up to v_max; do so within accel limits
-        double v_test = odom_vel + a_max*dt_; // if callbacks are slow, this could be abrupt
-        // operator:  c = (a>b) ? a : b;
-        new_cmd_vel = (v_test < scheduled_vel) ? v_test : scheduled_vel; //choose lesser of two options
-        ROS_INFO("goin faster from %f to %f", odom_vel, new_cmd_vel);
-        // this prevents overshooting scheduled_vel
-    } else if (odom_vel > scheduled_vel) { //travelling too fast--this could be trouble
-        // ramp down to the scheduled velocity.  However, scheduled velocity might already be ramping down at a_max.
-        // need to catch up, so ramp down even faster than a_max.  Try 1.2*a_max.
-        ROS_INFO("odom vel: %f; sched vel: %f",odom_vel,scheduled_vel); //debug/analysis output; can comment this out
-        
-        double v_test = odom_vel - 1.2 * a_max*dt_; //moving too fast--try decelerating faster than nominal a_max
-
-        new_cmd_vel = (v_test > scheduled_vel) ? v_test : scheduled_vel; // choose larger of two options...don't overshoot scheduled_vel
-    } else {
-        new_cmd_vel = scheduled_vel; //silly third case: this is already true, if here.  Issue the scheduled velocity
-    }
-    return new_cmd_vel;
-}
-
-//Lets grab the current vel and adjust it with the appropriate values
+//DUMMY--fill this in
 double DesStateGenerator::compute_speed_profile() {
-
-    double dist_len_accel = 0.5 * (odom_vel_ * odom_vel_) / MAX_ACCEL;
-
-    double next_vel = 0;
-    ROS_INFO("Have %f to go and start stopping at %f",current_seg_length_to_go_, dist_len_accel);
-    if (current_seg_length_to_go_<= 0.0) { // at goal, or overshot; stop!
-        next_vel=0.0;
-
-        if(current_seg_length_to_go_/next_vel > TIME_TOL) { //We need to see if its already in the break zone but not going fast enough
-            next_vel = MAX_SPEED;
-            ROS_INFO("Its going too slow");
-        }
-    }
-    else if (current_seg_length_to_go_ <= dist_len_accel) { //possibly should be braking to a halt
-        // dist = 0.5*a*t_halt^2; so t_halt = sqrt(2*dist/a);   v = a*t_halt
-        // so v = a*sqrt(2*dist/a) = sqrt(2*dist*a)
-        next_vel = sqrt(2 * current_seg_length_to_go_ * MAX_ACCEL);
-
-        if(current_seg_length_to_go_/next_vel > TIME_TOL) { //We need to see if its already in the break zone but not going fast enough
-            next_vel = MAX_SPEED;
-            ROS_INFO("Its going too slow");
-        }
-
-        ROS_INFO("braking zone: v_sched = %f",next_vel);
-    }
-    else { // not ready to decel, so target vel is v_max, either accel to it or hold it
-        next_vel = MAX_SPEED;
-        ROS_INFO("Rampup or hold with dist_len_accel %f",dist_len_accel);
-    }
-
-    next_vel = compare_to_scheduled_vel(odom_vel_,next_vel,MAX_ACCEL);
-
-    return next_vel;
+    return MAX_SPEED;
 }
 
-// Lets do the same with the omega
+// MAKE THIS BETTER!!
 double DesStateGenerator::compute_omega_profile() {
-
-    double next_rot_vel = 0;
-    double odom_omega_abs = fabs(odom_omega_ );//speed
-    double dist_omg_accel = 0.5 * (odom_omega_abs * odom_omega_abs) / MAX_ALPHA;
-    double current_seg_phi_to_go_ = fabs(current_seg_phi_goal_ - odom_phi_);
-
-    if (current_seg_phi_to_go_<= (MAX_OMEGA / (2 * UPDATE_RATE))) { // we need to account for the error at the refresh rate of the fastest possible speed. Once in the possitive and once in the negative. at goal, or overshot; stop!
-        next_rot_vel=0.0;
-
-        if(current_seg_phi_to_go_/next_rot_vel > TIME_TOL){
-            next_rot_vel = MAX_OMEGA;
-            ROS_INFO("Its going too slow");
-        }
-    }
-    else if (current_seg_phi_to_go_ <= dist_omg_accel) { //possibly should be braking to a halt
-        // dist = 0.5*a*t_halt^2; so t_halt = sqrt(2*dist/a);   v = a*t_halt
-        // so v = a*sqrt(2*dist/a) = sqrt(2*dist*a)
-        next_rot_vel = sqrt(2 * current_seg_phi_to_go_ * MAX_ALPHA)/2;
-
-        if(current_seg_phi_to_go_/next_rot_vel > TIME_TOL){
-            next_rot_vel = MAX_OMEGA;
-            ROS_INFO("Its going too slow");
-        }
-
-        ROS_INFO("braking zone: v_sched = %f",next_rot_vel);
-    }
-    else { // not ready to decel, so target vel is v_max, either accel to it or hold it
-        next_rot_vel = MAX_OMEGA;
-        ROS_INFO("Rampup or hold with dist_omg_accel %f, odom_omega_abs %f",dist_omg_accel, odom_omega_abs);
-    }
-
-    next_rot_vel = compare_to_scheduled_vel(odom_omega_abs,next_rot_vel,MAX_ALPHA);
-
-    double des_omega = sgn(current_seg_curvature_) * next_rot_vel;
+    double des_omega = sgn(current_seg_curvature_)*MAX_OMEGA;
     ROS_INFO("compute_omega_profile: des_omega = %f",des_omega);
     return des_omega; // spin in direction of closest rotation to target heading
 }
+
 
 int main(int argc, char** argv) {
     // ROS set-ups:
@@ -700,7 +612,7 @@ int main(int argc, char** argv) {
         if (desStateGenerator.get_current_path_seg_done()) {
             //here if we have completed a path segment, so try to get another one
             // if necessary, construct new path segments from new polyline path subgoal
-            desStateGenerator.unpack_next_path_segment(); 
+            desStateGenerator.unpack_next_path_segment();
         }
 
         desStateGenerator.update_des_state(); // update the desired state and publish it; 

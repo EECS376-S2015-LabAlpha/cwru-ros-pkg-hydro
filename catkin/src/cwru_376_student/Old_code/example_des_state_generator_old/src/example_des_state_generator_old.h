@@ -51,15 +51,13 @@ const int ARC = cwru_msgs::PathSegment::ARC;
 const int SPIN_IN_PLACE = cwru_msgs::PathSegment::SPIN_IN_PLACE;
 
 // dynamic limitations
-const double MAX_SPEED = 1; // m/sec; adjust this
+const double MAX_SPEED = 0.5; // m/sec; adjust this
 const double MAX_OMEGA = 0.5; //1.0; // rad/sec; adjust this
-const double MAX_ACCEL = 1; // m/sec^2; adjust this
-const double MAX_ALPHA = 0.25; // rad/sec^2; adjust this
+const double MAX_ACCEL = 1.0; // m/sec^2; adjust this
+const double MAX_ALPHA = 1.0; // rad/sec^2; adjust this
 
-const double LENGTH_TOL = 0.001; // tolerance for path; adjust this
-const double HEADING_TOL = 0.005; // heading tolerance; adjust this
-
-const double TIME_TOL = 1; // Time for the computed decceleration to resolve
+const double LENGTH_TOL = 0.05; // tolerance for path; adjust this
+const double HEADING_TOL = 0.05; // heading tolerance; adjust this
 
 const double UPDATE_RATE = 50.0; // choose the desired-state publication update rate
 
@@ -71,8 +69,6 @@ public:
     DesStateGenerator(ros::NodeHandle* nodehandle); //"main" will need to instantiate a ROS nodehandle, then pass it to the constructor
 
     // some utilities:
-
-
     //signum function: define this one in-line
     double sgn(double x) { if (x>0.0) {return 1.0; }
     else if (x<0.0) {return -1.0;}
@@ -186,8 +182,7 @@ private:
     // these should do triangular or trapezoidal velocity profiling
     // they should also be smart enough to recognize E-stops, etc.
     double compute_speed_profile();
-    double compute_omega_profile(); 
-    double compare_to_scheduled_vel(double odom_vel,double scheduled_vel,double a_max);   
+    double compute_omega_profile();    
     
     // these are "crawler" functions.  Given a current path segment, they update desired state objects
     // and publish the resulting desired state;

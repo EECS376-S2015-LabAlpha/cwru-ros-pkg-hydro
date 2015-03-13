@@ -7,7 +7,7 @@
 
 
 // this header incorporates all the necessary #include files and defines the class "SteeringController"
-#include "simple_steering.h"
+#include "example_steering_algorithm_old.h"
 
 //CONSTRUCTOR:  this will get called whenever an instance of this class is created
 // want to put all dirty work of initializations here
@@ -190,56 +190,13 @@ void SteeringController::my_clever_steering_algorithm() {
     steering_errs_publisher_.publish(steering_errs_); // suitable for plotting w/ rqt_plot
     //END OF DEBUG STUFF
     
-    /* 
-        x
-        |
-        |
-        |   /
-        |--/
-
-
-        x
-        |
-        |
-        | \
-        |--\
-
-    */
-    double desired_heading = atan(2*lateral_err); // relative to the actual heading
-    // heading_err is current relative to the actual heading
-    double steering_correction = min_dang(desired_heading-heading_err);
-    //     trip_dist_correction = trip_dist_error;
-
-    // theta covered = (omega_odom+omega_cmd)/2*(1/UPDATE_RATE) = (w_odom+w_cmd) / (2 * UPDATE_RATE)
-    // omega_odom + omega_cmd = (theta_desired) * (2 * UPDATE_RATE)
-    // omega_cmd = (theta_desired*2*UPDATE_RATE) - omega_odom
-
-    double speed_correction = (-0.5)*atan(1.0*trip_dist_err);
-
-    // now we have corrections
-    controller_speed = std::max(std::min(1.1*MAX_SPEED, des_state_vel_+speed_correction), 0.0);
-
-    if(steering_correction > .5) {
-        controller_speed = std::max(0.0, odom_vel_ - MAX_ALPHA);
-    }
-
-    controller_omega = steering_correction*2.0*UPDATE_RATE - odom_omega_;
-
-    // apply speed and acceleration limits
-    if(controller_omega > MAX_OMEGA) { controller_omega = MAX_OMEGA; }
-    if(controller_omega < -1.0*MAX_OMEGA) { controller_omega = -1.0*MAX_OMEGA; }
-    if(odom_omega_ + MAX_ALPHA < controller_omega) { controller_omega = odom_omega_ + MAX_ALPHA; }
-    if(odom_omega_ - MAX_ALPHA > controller_omega) { controller_omega = odom_omega_ - MAX_ALPHA; }
-
-
      // do something clever with this information     
     
     controller_speed = des_state_vel_; //you call that clever ?!?!?!? should speed up/slow down to null out 
     controller_omega = des_state_omega_; //ditto
-
-    double controller_omega_temp = controller_omega;
+ 
     controller_omega = MAX_OMEGA*sat(controller_omega/MAX_OMEGA); // saturate omega command at specified limits
-    ROS_INFO("had %f and now have %f going out",controller_omega,controller_omega_temp);
+    
     // send out our very clever speed/spin commands:
     twist_cmd_.linear.x = controller_speed;
     twist_cmd_.angular.z = controller_omega;

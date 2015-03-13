@@ -1,4 +1,4 @@
-// simple_steering.h header file //
+// example_steering_algorithm.h header file //
 // wsn; Feb, 2015
 // include this file in "example_steering_algorithm.cpp"
 
@@ -39,7 +39,6 @@ const double K_TRIP_DIST = 1.0;
 // dynamic limitations:  these apply to the steering controller; they may be larger than the limits on des state generation
 const double MAX_SPEED = 1.0; // m/sec; adjust this
 const double MAX_OMEGA = 1.0; //1.0; // rad/sec; adjust this
-const double MAX_ALPHA = 0.1;
 
 
 // define a class, including a constructor, member variables and member functions

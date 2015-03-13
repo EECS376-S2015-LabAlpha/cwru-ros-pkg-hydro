@@ -1,0 +1,22 @@
+Running simulated cwruBot with subgoals in map space
+
+start up cwruBot
+1.
+start roscore
+2.
+rosparam set use_sim_time true
+3.
+rosrun gazebo_ros gazebo
+4.
+roslaunch cwru_urdf cwruBot.launch
+5.
+insert a Gazebo model, e.g. the starting pen
+6.
+rosrun map_server map_server startingPMap.yaml (from the cwru_urdf directory: load a map of
+the starting pen).
+
+To kill roscore and gazebo
+
+killall -9 roscore
+killall -9 rosmaster
+killall gzserver
