@@ -24,7 +24,7 @@ int ans;
 DesStateGenerator::DesStateGenerator(ros::NodeHandle* nodehandle) : nh_(*nodehandle) { // constructor
     ROS_INFO("in class constructor of DesStateGenerator");
     
-    tfListener_ = new tf::TransformListener;  //create a transform listener
+    /*tfListener_ = new tf::TransformListener;  //create a transform listener
     
     // wait to start receiving valid tf transforms between map and odom:
     bool tferr=true;
@@ -44,7 +44,7 @@ DesStateGenerator::DesStateGenerator(ros::NodeHandle* nodehandle) : nh_(*nodehan
             }   
     }
     ROS_INFO("tf is good");
-    // from now on, tfListener will keep track of transforms
+    // from now on, tfListener will keep track of transforms */
     
     initializeSubscribers(); // package up the messy work of creating subscribers; do this overhead in constructor
     initializePublishers();
@@ -94,7 +94,7 @@ DesStateGenerator::DesStateGenerator(ros::NodeHandle* nodehandle) : nh_(*nodehan
 void DesStateGenerator::initializeSubscribers() {
     ROS_INFO("Initializing Subscribers");
     odom_subscriber_ = nh_.subscribe("/odom", 1, &DesStateGenerator::odomCallback, this); //subscribe to odom messages
-    lidar_subscriber_ = nh_.subscribe("/LidarSpace", 1, &DesStateGenerator::lidarCallback, this);
+    lidar_subscriber_ = nh_.subscribe("/lidar_spaces", 1, &DesStateGenerator::lidarCallback, this);
     // add more subscribers here, as needed
 }
 
@@ -293,7 +293,8 @@ void DesStateGenerator::process_new_vertex() {
     // we want to build path segments to take us from the current pose to the new goal pose
     // the goal pose is transformed to odom coordinates at the last moment, to minimize odom drift issues
     geometry_msgs::Pose map_pose = map_pose_stamped.pose; //strip off the header to simplify notation
-    geometry_msgs::PoseStamped goal_pose_wrt_odom = map_to_odom_pose(map_pose_stamped); // convert new subgoal pose from map to odom coords    
+    //geometry_msgs::PoseStamped goal_pose_wrt_odom = map_to_odom_pose(map_pose_stamped); // convert new subgoal pose from map to odom coords
+    geometry_msgs::PoseStamped goal_pose_wrt_odom = map_pose_stamped;
     geometry_msgs::Pose start_pose_wrt_odom;  // this should be the starting point for our next journey segment
 
     last_map_pose_rcvd_ = map_pose_stamped; // save a copy of this subgoal in memory, in case we need it later
@@ -341,6 +342,12 @@ void DesStateGenerator::process_new_vertex() {
         
     }
 
+    //Check if the largest gap is big enough for the robot to fit through
+    if(bestVec.z < 1.5) {
+        //NO SAFE PATH POSSIBLE!
+    }
+
+    
     //At this point, we either found an obstacle, and have a bestVec that indicates where we should go, or there is no
     //obstacle, and we should just continue with the old path
     if (foundObstacle) {
@@ -625,7 +632,7 @@ nav_msgs::Odometry DesStateGenerator::update_des_state_lineseg() {
     double delta_s = current_speed_des_*dt_; //incremental forward move distance; a scalar
     
     current_seg_length_to_go_ -= delta_s; // plan to move forward by this much
-    ROS_INFO("update_des_state_lineseg: current_segment_length_to_go_ = %f",current_seg_length_to_go_);     
+    //ROS_INFO("update_des_state_lineseg: current_segment_length_to_go_ = %f",current_seg_length_to_go_);     
     if (current_seg_length_to_go_ < LENGTH_TOL) { // check if done with this move
         // done with line segment;
         current_seg_type_ = HALT;
@@ -633,7 +640,7 @@ nav_msgs::Odometry DesStateGenerator::update_des_state_lineseg() {
         current_seg_length_to_go_=0.0;
         current_speed_des_ = 0.0;  // 
         current_path_seg_done_ = true; 
-        ROS_INFO("update_des_state_lineseg: done with translational motion commands");
+        //ROS_INFO("update_des_state_lineseg: done with translational motion commands");
     }
     else { // not done with translational move yet--step forward
         // based on distance covered, compute current desired x,y; use scaled vector from v1 to v2 
@@ -663,9 +670,9 @@ nav_msgs::Odometry DesStateGenerator::update_des_state_spin() {
     current_omega_des_ = compute_omega_profile(); //USE VEL PROFILING 
     
     double delta_phi = current_omega_des_*dt_; //incremental rotation--could be + or -
-    ROS_INFO("update_des_state_spin: delta_phi = %f",delta_phi);
-    current_seg_length_to_go_ -= fabs(delta_phi); // decrement the (absolute) distance (rotation) to go
-    ROS_INFO("update_des_state_spin: current_segment_length_to_go_ = %f",current_seg_length_to_go_);    
+    //ROS_INFO("update_des_state_spin: delta_phi = %f",delta_phi);
+   // current_seg_length_to_go_ -= fabs(delta_phi); // decrement the (absolute) distance (rotation) to go
+    //ROS_INFO("update_des_state_spin: current_segment_length_to_go_ = %f",current_seg_length_to_go_);    
     
     if (current_seg_length_to_go_ < HEADING_TOL) { // check if done with this move
         current_seg_type_ = HALT;
@@ -675,7 +682,7 @@ nav_msgs::Odometry DesStateGenerator::update_des_state_spin() {
         current_omega_des_ = 0.0;
         current_seg_phi_des_ =   current_seg_init_tan_angle_ + sgn(current_seg_curvature_)*current_seg_length_;  
         current_path_seg_done_ = true;
-        ROS_INFO("update_des_state_spin: done with spin");
+        //ROS_INFO("update_des_state_spin: done with spin");
     }
     else { // not done yet--rotate some more
         // based on angular distance covered, compute current desired heading
@@ -717,7 +724,7 @@ double DesStateGenerator::compute_speed_profile() {
 // MAKE THIS BETTER!!
 double DesStateGenerator::compute_omega_profile() {
     double des_omega = sgn(current_seg_curvature_)*MAX_OMEGA;
-    ROS_INFO("compute_omega_profile: des_omega = %f",des_omega);
+    //ROS_INFO("compute_omega_profile: des_omega = %f",des_omega);
     return des_omega; // spin in direction of closest rotation to target heading
 }
 
