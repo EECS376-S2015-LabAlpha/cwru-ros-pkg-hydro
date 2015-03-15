@@ -63,8 +63,8 @@ int main(int argc, char **argv) {
     
     // fill in the interesting data: (x,y) and phi = location and heading
     //vertex 1:
-    x=0;
-    y=0;
+    x=5;
+    y=5;
     phi=0;
     ROS_INFO("vertex: x,y,phi = %f, %f %f",x,y,phi);
     vertex.pose = xyPhi2Pose(x,y,phi); //x,y,phi
