@@ -1,5 +1,5 @@
 //example_steering_algorithm.cpp:
-//wsn, Feb 2015
+//wcb38, Feb 2015
 
 #include "simple_steering.h"
 

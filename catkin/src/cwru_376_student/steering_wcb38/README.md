@@ -1,3 +1,5 @@
+If you'd like to work from this steering algorithm, please make your own branch or package.
+
 # steering_wcb38
 
 A steering algorithm that converts lateral, heading and trip-dist errors into 
