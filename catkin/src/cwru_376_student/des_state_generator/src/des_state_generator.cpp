@@ -53,7 +53,8 @@ DesStateGenerator::DesStateGenerator(ros::NodeHandle* nodehandle) : nh_(*nodehan
     current_seg_ref_point_(0) = odom_x_;   
     current_seg_ref_point_(1) = odom_y_;
 
-    odem_acc_ = .01;
+    odem_acc_x = 0;
+    odem_acc_z = 0;
     updating = false;
     
     // these are dynamic variables, used to incrementally update the desired state:
@@ -111,8 +112,9 @@ void DesStateGenerator::odomCallback(const nav_msgs::Odometry& odom_rcvd) {
     current_odom_ = odom_rcvd; // save the entire message
     // but also pick apart pieces, for ease of use
     odom_pose_ = odom_rcvd.pose.pose;
-    odem_acc_ = (odom_rcvd.twist.twist.linear.x - odom_vel_)/ dt_;
+    odem_acc_x = (odom_rcvd.twist.twist.linear.x - odom_vel_)/ dt_;
     odom_vel_ = odom_rcvd.twist.twist.linear.x;
+    odem_acc_z = (odom_rcvd.twist.twist.angular.z - odom_omega_)/ dt_;
     odom_omega_ = odom_rcvd.twist.twist.angular.z;
     odom_x_ = odom_rcvd.pose.pose.position.x;
     odom_y_ = odom_rcvd.pose.pose.position.y;
@@ -621,8 +623,11 @@ double DesStateGenerator::compare_to_scheduled_vel(double odom_vel,double schedu
 
 //Lets grab the current vel and adjust it with the appropriate values
 double DesStateGenerator::compute_speed_profile() {
-
-    double dist_len_accel = 0.5 * (odom_vel_ * odom_vel_) / MAX_ACCEL;
+    double dist_len_accel;
+    if(odem_acc_x != 0)
+        dist_len_accel = 0.5 * (odom_vel_ * odom_vel_) / odem_acc_x; //with the current speed this is how long it will take to halt
+    else dist_len_accel = 999999999999;
+    
 
     double next_vel = 0;
     ROS_INFO("Have %f to go and start stopping at %f",current_seg_length_to_go_, dist_len_accel);
@@ -659,8 +664,8 @@ double DesStateGenerator::compute_omega_profile() {
     ROS_INFO("***odom_omega_ = %f",odom_omega_);
     double odom_omega_abs = fabs(odom_omega_ );//speed
     double dist_omg_accel;
-    if(odem_acc_ != 0)
-    dist_omg_accel = 0.5 * (odom_omega_abs * odom_omega_abs) / odem_acc_; //with the current speed this is how long it will take to halt
+    if(odem_acc_z != 0)
+    dist_omg_accel = 0.5 * (odom_omega_abs * odom_omega_abs) / odem_acc_z; //with the current speed this is how long it will take to halt
     else dist_omg_accel = 999999999999;
     double current_seg_phi_to_go_ = fabs(current_seg_phi_goal_ - odom_phi_);
 

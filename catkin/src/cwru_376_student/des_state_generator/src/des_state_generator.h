@@ -125,7 +125,8 @@ private:
     double odom_x_;
     double odom_y_;
     double odom_phi_;
-    double odem_acc_;
+    double odem_acc_x;
+    double odem_acc_z;
     geometry_msgs::Quaternion odom_quat_;
    
 
