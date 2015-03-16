@@ -1,9 +1,8 @@
 // simple_steering.h header file //
-// wsn; Feb, 2015
-// include this file in "example_steering_algorithm.cpp"
+// wcb38; 1000-03-06-2015
 
-#ifndef EXAMPLE_STEERING_ALGORITHM_H_
-#define EXAMPLE_STEERING_ALGORITHM_H_
+#ifndef LABALPHA_STEERING_SIMPLE_H_
+#define LABALPHA_STEERING_SIMPLE_H_
 
 //some generically useful stuff to include...
 #include <math.h>
@@ -25,6 +24,7 @@
 #include <geometry_msgs/PointStamped.h>
 #include <geometry_msgs/PoseStamped.h>
 #include <nav_msgs/Odometry.h>
+ #include <tf/transform_listener.h>
 
 //Eigen is useful for linear algebra
 #include <Eigen/Eigen>
@@ -64,7 +64,11 @@ private:
     ros::Publisher steering_errs_publisher_;
     
     ros::ServiceServer simple_service_; //a do-nothing service--but easily modified to be useful
-
+    
+    tf::TransformListener* tfListener_;
+    tf::StampedTransform mapToOdom_; 
+    tf::StampedTransform baseLink_wrt_map_;    
+    tf::StampedTransform odomToMap_;
     geometry_msgs::Twist twist_cmd_;
     geometry_msgs::TwistStamped twist_cmd2_;    
     double current_speed_des_;
@@ -101,7 +105,7 @@ private:
     void initializePublishers();
     void initializeServices();
  
-    void odomCallback(const nav_msgs::Odometry& odom_rcvd);
+    void currentStateCB(const nav_msgs::Odometry& odom_rcvd);
     void desStateCallback(const nav_msgs::Odometry& des_state_rcvd);    
         
     //prototype for callback for example service
@@ -109,4 +113,4 @@ private:
     bool serviceCallback(cwru_srv::simple_bool_service_messageRequest& request, cwru_srv::simple_bool_service_messageResponse& response);
 }; // note: a class definition requires a semicolon at the end of the definition
 
-#endif  // this closes the header-include trick...ALWAYS need one of these to match #ifndef
+#endif

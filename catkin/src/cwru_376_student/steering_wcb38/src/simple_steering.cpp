@@ -1,21 +1,12 @@
 //example_steering_algorithm.cpp:
 //wsn, Feb 2015
-//should subscribe to desired state and to odom
-// then invoke an algorithm to command speed and spin
-// should update this computation adequately fast
 
-
-
-// this header incorporates all the necessary #include files and defines the class "SteeringController"
 #include "simple_steering.h"
 
-//CONSTRUCTOR:  this will get called whenever an instance of this class is created
-// want to put all dirty work of initializations here
-// odd syntax: have to pass nodehandle pointer into constructor for constructor to build subscribers, etc
 SteeringController::SteeringController(ros::NodeHandle* nodehandle):nh_(*nodehandle)
 { // constructor
     ROS_INFO("in class constructor of SteeringController");
-    initializeSubscribers(); // package up the messy work of creating subscribers; do this overhead in constructor
+    initializeSubscribers();
     initializePublishers();
     initializeServices();
     
@@ -27,6 +18,27 @@ SteeringController::SteeringController(ros::NodeHandle* nodehandle):nh_(*nodehan
         ros::spinOnce();
     }
     ROS_INFO("constructor: got an odom message");    
+    
+    tfListener_ = new tf::TransformListener; 
+ 
+    bool tferr=true;
+    ROS_INFO("waiting for tf...");
+    while (tferr) {
+        tferr=false;
+        try {
+                //try to lookup transform from target frame "odom" to source frame "map"
+            //The direction of the transform returned will be from the target_frame to the source_frame. 
+             //Which if applied to data, will transform data in the source_frame into the target_frame. See tf/CoordinateFrameConventions#Transform_Direction
+                tfListener_->lookupTransform("odom", "map", ros::Time(0), mapToOdom_);
+            } catch(tf::TransformException &exception) {
+                ROS_ERROR("%s", exception.what());
+                tferr=true;
+                ros::Duration(0.5).sleep(); // sleep for half a second
+                ros::spinOnce();                
+            }   
+    }
+    ROS_INFO("tf is good");
+    // from now on, tfListener will keep track of transforms from map frame to target frame
     
     //initialize desired state, in case this is not yet being published adequately
     des_state_ = current_odom_;  // use the current odom state
@@ -53,9 +65,9 @@ SteeringController::SteeringController(ros::NodeHandle* nodehandle):nh_(*nodehan
 //member helper function to set up subscribers;
 void SteeringController::initializeSubscribers() {
     ROS_INFO("Initializing Subscribers: odom and desState");
-    odom_subscriber_ = nh_.subscribe("/odom", 1, &SteeringController::odomCallback, this); //subscribe to odom messages
+    odom_subscriber_ = nh_.subscribe("/current_state", 1, &SteeringController::currentStateCB, this); //subscribe to odom messages
     // add more subscribers here, as needed
-    des_state_subscriber_ = nh_.subscribe("/desState", 1, &SteeringController::desStateCallback, this); // for desired state messages
+    des_state_subscriber_ = nh_.subscribe("/desired_state", 1, &SteeringController::desStateCallback, this); // for desired state messages
 }
 
 //member helper function to set up services:
@@ -80,7 +92,7 @@ void SteeringController::initializePublishers()
 
 
 
-void SteeringController::odomCallback(const nav_msgs::Odometry& odom_rcvd) {
+void SteeringController::currentStateCB(const nav_msgs::Odometry& odom_rcvd) {
     // copy some of the components of the received message into member vars
     // we care about speed and spin, as well as position estimates x,y and heading
     current_odom_ = odom_rcvd; // save the entire message
@@ -163,7 +175,7 @@ void SteeringController::my_clever_steering_algorithm() {
     n_vec(0) = -t_vec(1);
     n_vec(1) = t_vec(0);
     
-    double heading_err;  
+    double heading_err;
     double lateral_err;
     double trip_dist_err; // error is scheduling...are we ahead or behind?
     
@@ -231,15 +243,6 @@ void SteeringController::my_clever_steering_algorithm() {
     if(odom_omega_ + MAX_ALPHA < controller_omega) { controller_omega = odom_omega_ + MAX_ALPHA; }
     if(odom_omega_ - MAX_ALPHA > controller_omega) { controller_omega = odom_omega_ - MAX_ALPHA; }
 
-
-     // do something clever with this information     
-    
-    controller_speed = des_state_vel_; //you call that clever ?!?!?!? should speed up/slow down to null out 
-    controller_omega = des_state_omega_; //ditto
-
-    double controller_omega_temp = controller_omega;
-    controller_omega = MAX_OMEGA*sat(controller_omega/MAX_OMEGA); // saturate omega command at specified limits
-    ROS_INFO("had %f and now have %f going out",controller_omega,controller_omega_temp);
     // send out our very clever speed/spin commands:
     twist_cmd_.linear.x = controller_speed;
     twist_cmd_.angular.z = controller_omega;
