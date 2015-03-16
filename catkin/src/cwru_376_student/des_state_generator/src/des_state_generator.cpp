@@ -14,6 +14,8 @@
 
 #include "des_state_generator.h"
 int ans;
+//used to lock the update values
+static bool updating = false;
 //double dist_len_accel = 0.5 * (MAX_SPEED * MAX_SPEED) / MAX_ACCEL; //Vinit^2 = Vfinal^2 + 2 a d
 //double dist_omg_accel = 0.5 * (MAX_OMEGA * MAX_OMEGA) / MAX_ALPHA;
 
@@ -464,7 +466,10 @@ void DesStateGenerator::unpack_next_path_segment() {
     
 // no arguments--uses values in member variables 
 void DesStateGenerator::update_des_state() {
-    switch (current_seg_type_) {
+    if(!updating)
+    {
+        updating = true;
+        switch (current_seg_type_) {
         case LINE: 
             des_state_ = update_des_state_lineseg();          
             break;
@@ -474,8 +479,10 @@ void DesStateGenerator::update_des_state() {
         case ARC:  // not implemented; set segment type to HALT
         default:  
             des_state_ = update_des_state_halt();   
+        }
+        des_state_publisher_.publish(des_state_); //send out our message
+        updating = false;
     }
-    des_state_publisher_.publish(des_state_); //send out our message
 }
 
 
@@ -612,11 +619,7 @@ double DesStateGenerator::compute_speed_profile() {
     ROS_INFO("Have %f to go and start stopping at %f",current_seg_length_to_go_, dist_len_accel);
     if (current_seg_length_to_go_<= 0.0) { // at goal, or overshot; stop!
         next_vel=0.0;
-
-        if(current_seg_length_to_go_/next_vel > TIME_TOL) { //We need to see if its already in the break zone but not going fast enough
-            next_vel = MAX_SPEED;
-            ROS_INFO("Its going too slow");
-        }
+        ROS_INFO("Halting");
     }
     else if (current_seg_length_to_go_ <= dist_len_accel) { //possibly should be braking to a halt
         // dist = 0.5*a*t_halt^2; so t_halt = sqrt(2*dist/a);   v = a*t_halt
@@ -650,11 +653,7 @@ double DesStateGenerator::compute_omega_profile() {
 
     if (current_seg_phi_to_go_<= (MAX_OMEGA / (2 * UPDATE_RATE))) { // we need to account for the error at the refresh rate of the fastest possible speed. Once in the possitive and once in the negative. at goal, or overshot; stop!
         next_rot_vel=0.0;
-
-        if(current_seg_phi_to_go_/next_rot_vel > TIME_TOL){
-            next_rot_vel = MAX_OMEGA;
-            ROS_INFO("Its going too slow");
-        }
+        ROS_INFO("Halting");
     }
     else if (current_seg_phi_to_go_ <= dist_omg_accel) { //possibly should be braking to a halt
         // dist = 0.5*a*t_halt^2; so t_halt = sqrt(2*dist/a);   v = a*t_halt
