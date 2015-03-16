@@ -14,8 +14,9 @@
 
 #include "des_state_generator.h"
 int ans;
-//used to lock the update values
-static bool updating = false;
+ //used to lock the update values
+    static bool updating;
+
 //double dist_len_accel = 0.5 * (MAX_SPEED * MAX_SPEED) / MAX_ACCEL; //Vinit^2 = Vfinal^2 + 2 a d
 //double dist_omg_accel = 0.5 * (MAX_OMEGA * MAX_OMEGA) / MAX_ALPHA;
 
@@ -51,6 +52,9 @@ DesStateGenerator::DesStateGenerator(ros::NodeHandle* nodehandle) : nh_(*nodehan
     current_seg_phi_goal_ = odom_phi_;
     current_seg_ref_point_(0) = odom_x_;   
     current_seg_ref_point_(1) = odom_y_;
+
+    odem_acc_ = .01;
+    updating = false;
     
     // these are dynamic variables, used to incrementally update the desired state:
     current_seg_phi_des_=odom_phi_;    
@@ -61,6 +65,8 @@ DesStateGenerator::DesStateGenerator(ros::NodeHandle* nodehandle) : nh_(*nodehan
     
     waiting_for_vertex_ = true;
     current_path_seg_done_ = true;
+
+
 
     last_map_pose_rcvd_ = odom_to_map_pose(odom_pose_); // treat the current odom pose as the first vertex--cast it into map coords to save
 }
@@ -105,6 +111,7 @@ void DesStateGenerator::odomCallback(const nav_msgs::Odometry& odom_rcvd) {
     current_odom_ = odom_rcvd; // save the entire message
     // but also pick apart pieces, for ease of use
     odom_pose_ = odom_rcvd.pose.pose;
+    odem_acc_ = (odom_rcvd.twist.twist.linear.x - odom_vel_)/ dt_;
     odom_vel_ = odom_rcvd.twist.twist.linear.x;
     odom_omega_ = odom_rcvd.twist.twist.angular.z;
     odom_x_ = odom_rcvd.pose.pose.position.x;
@@ -594,9 +601,10 @@ double DesStateGenerator::compare_to_scheduled_vel(double odom_vel,double schedu
         double v_test = odom_vel + a_max*dt_; // if callbacks are slow, this could be abrupt
         // operator:  c = (a>b) ? a : b;
         new_cmd_vel = (v_test < scheduled_vel) ? v_test : scheduled_vel; //choose lesser of two options
-        ROS_INFO("goin faster from %f to %f", odom_vel, new_cmd_vel);
+        ROS_INFO("goin faster from %f to %f with v_test %f, a_max %f, and dt_ %f", odom_vel, new_cmd_vel, v_test, a_max, dt_);
         // this prevents overshooting scheduled_vel
-    } else if (odom_vel > scheduled_vel) { //travelling too fast--this could be trouble
+    } else 
+    if (odom_vel > scheduled_vel) { //travelling too fast--this could be trouble
         // ramp down to the scheduled velocity.  However, scheduled velocity might already be ramping down at a_max.
         // need to catch up, so ramp down even faster than a_max.  Try 1.2*a_max.
         ROS_INFO("odom vel: %f; sched vel: %f",odom_vel,scheduled_vel); //debug/analysis output; can comment this out
@@ -606,6 +614,7 @@ double DesStateGenerator::compare_to_scheduled_vel(double odom_vel,double schedu
         new_cmd_vel = (v_test > scheduled_vel) ? v_test : scheduled_vel; // choose larger of two options...don't overshoot scheduled_vel
     } else {
         new_cmd_vel = scheduled_vel; //silly third case: this is already true, if here.  Issue the scheduled velocity
+        ROS_INFO("silly scheduled case");
     }
     return new_cmd_vel;
 }
@@ -647,8 +656,12 @@ double DesStateGenerator::compute_speed_profile() {
 double DesStateGenerator::compute_omega_profile() {
 
     double next_rot_vel = 0;
+    ROS_INFO("***odom_omega_ = %f",odom_omega_);
     double odom_omega_abs = fabs(odom_omega_ );//speed
-    double dist_omg_accel = 0.5 * (odom_omega_abs * odom_omega_abs) / MAX_ALPHA;
+    double dist_omg_accel;
+    if(odem_acc_ != 0)
+    dist_omg_accel = 0.5 * (odom_omega_abs * odom_omega_abs) / odem_acc_; //with the current speed this is how long it will take to halt
+    else dist_omg_accel = 999999999999;
     double current_seg_phi_to_go_ = fabs(current_seg_phi_goal_ - odom_phi_);
 
     if (current_seg_phi_to_go_<= (MAX_OMEGA / (2 * UPDATE_RATE))) { // we need to account for the error at the refresh rate of the fastest possible speed. Once in the possitive and once in the negative. at goal, or overshot; stop!
@@ -670,12 +683,13 @@ double DesStateGenerator::compute_omega_profile() {
     else { // not ready to decel, so target vel is v_max, either accel to it or hold it
         next_rot_vel = MAX_OMEGA;
         ROS_INFO("Rampup or hold with dist_omg_accel %f, odom_omega_abs %f",dist_omg_accel, odom_omega_abs);
+
     }
 
     next_rot_vel = compare_to_scheduled_vel(odom_omega_abs,next_rot_vel,MAX_ALPHA);
 
     double des_omega = sgn(current_seg_curvature_) * next_rot_vel;
-    ROS_INFO("compute_omega_profile: des_omega = %f",des_omega);
+    ROS_INFO("~~~compute_omega_profile: des_omega = %f",des_omega);
     return des_omega; // spin in direction of closest rotation to target heading
 }
 

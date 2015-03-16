@@ -61,7 +61,7 @@ const double HEADING_TOL = 0.005; // heading tolerance; adjust this
 
 const double TIME_TOL = 1; // Time for the computed decceleration to resolve
 
-const double UPDATE_RATE = 50.0; // choose the desired-state publication update rate
+const double UPDATE_RATE = 100.0; // choose the desired-state publication update rate
 
 // define a class, including a constructor, member variables and member functions
 
@@ -125,7 +125,9 @@ private:
     double odom_x_;
     double odom_y_;
     double odom_phi_;
+    double odem_acc_;
     geometry_msgs::Quaternion odom_quat_;
+   
 
     //path description values:  these are all with respect to odom coordinates
     // these values get set once upon construction of the current path segment:
