@@ -254,7 +254,7 @@ geometry_msgs::PoseStamped DesStateGenerator::map_to_odom_pose(geometry_msgs::Po
     
      ROS_INFO("new subgoal: goal in odom pose is (x,y) = (%f, %f)",odom_pose.pose.position.x,odom_pose.pose.position.y);
      ROS_INFO("odom_pose frame id: ");
-     std::cout<<odom_pose.header.frame_id<<std::endl;
+
          if (true) {
             std::cout<<"DEBUG:  enter 1: ";
             std::cin>>ans;   
@@ -312,16 +312,20 @@ void DesStateGenerator::process_new_vertex() {
     std::vector<cwru_msgs::PathSegment> vec_of_path_segs; // container for path segments to be built
     
 
-    geometry_msgs::Vector3 bestVec = lidarSpaces[0]; //Initialize the largest-gap vector to the first one
+    //std::cout<<"SegFault 1"<<std::endl;
+    ROS_WARN("SegFault1");
 
+    geometry_msgs::Vector3 bestVec; //Initialize the largest-gap vector to the first one
+    ROS_WARN("SegFault2");
     //Before we build the path segments, we have to check the lidar data to make sure nothing is in the way:
     //Calculate the size of the lidarSlices array: by iterating through the lidarSpaces array and incrementing a counter
     int numSlices = 0;
     bool foundObstacle = false; //A boolean that will help "break" out of the outer for-loop as soon as we find an obstacle
+
+    
     for (lidar_space_detection::LidarSpaceSlice dummySlice : lidarSlices) {
         numSlices++;
     }
-
     //Now iterate over the slices 
     for (int i = 0; i < numSlices && !foundObstacle; i++) {
         //For each slice, populate an array of vector3 objects 
@@ -346,11 +350,12 @@ void DesStateGenerator::process_new_vertex() {
     if(bestVec.z < 1.5) {
         //NO SAFE PATH POSSIBLE!
     }
-
+    //std::cout<<"SegFault 2"<<std::endl;
     
     //At this point, we either found an obstacle, and have a bestVec that indicates where we should go, or there is no
     //obstacle, and we should just continue with the old path
     if (foundObstacle) {
+        ROS_WARN("FOUND AN OBSTACLE");
         //Add code here to convert Buck's vector3 into and odom pose
         geometry_msgs::Pose adjustedPose;
         adjustedPose.position.z = start_pose_wrt_odom.position.z;
@@ -382,7 +387,7 @@ void DesStateGenerator::process_new_vertex() {
         }
     // we have now updated the segment queue; these segments should get processed before they get "stale"
     }
-
+    
 
 
     
@@ -424,7 +429,7 @@ void DesStateGenerator::process_new_vertex() {
     spin_path_segment = build_spin_in_place_segment(v1, init_heading, des_heading);
     
     //put these path segments in a vector: first spin, then move along lineseg:
-    vec_of_path_segs.push_back(spin_path_segment);
+    //vec_of_path_segs.push_back(spin_path_segment);
     vec_of_path_segs.push_back(line_path_segment);
     std::cout<<"vec of pathsegs[0] ="<<vec_of_path_segs[0]<<std::endl;
     std::cout<<"vec of pathsegs[1] ="<<vec_of_path_segs[1]<<std::endl;    
@@ -514,12 +519,12 @@ void DesStateGenerator::unpack_next_path_segment() {
     cwru_msgs::PathSegment path_segment;
      ROS_INFO("unpack_next_path_segment: ");
     if (segment_queue_.empty()) {
-        ROS_INFO("no more segments in the path-segment queue");
+        ROS_WARN("no more segments in the path-segment queue");
         process_new_vertex(); //build and enqueue more path segments, if possible
     }
     if (waiting_for_vertex_) {       
         //we need more path segments.  Do we have another path vertex available?
-        ROS_INFO("no more vertices in the path queue either...");
+        //ROS_WARN("no more vertices in the path queue either...");
         current_seg_type_=HALT; // nothing more we can do until get more subgoals
         return;
         }
@@ -609,6 +614,8 @@ void DesStateGenerator::update_des_state() {
         default:  
             des_state_ = update_des_state_halt();   
     }
+    //ROS_WARN("Path planner is sending out: %f; and the angular is: %f", des_state_.twist
+        //.twist.linear.x, des_state_.twist.twist.angular.z);
     des_state_publisher_.publish(des_state_); //send out our message
 }
 
@@ -671,7 +678,7 @@ nav_msgs::Odometry DesStateGenerator::update_des_state_spin() {
     
     double delta_phi = current_omega_des_*dt_; //incremental rotation--could be + or -
     //ROS_INFO("update_des_state_spin: delta_phi = %f",delta_phi);
-   // current_seg_length_to_go_ -= fabs(delta_phi); // decrement the (absolute) distance (rotation) to go
+    current_seg_length_to_go_ -= fabs(delta_phi); // decrement the (absolute) distance (rotation) to go
     //ROS_INFO("update_des_state_spin: current_segment_length_to_go_ = %f",current_seg_length_to_go_);    
     
     if (current_seg_length_to_go_ < HEADING_TOL) { // check if done with this move
