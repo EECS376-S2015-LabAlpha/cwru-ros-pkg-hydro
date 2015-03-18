@@ -107,7 +107,8 @@ private:
     ros::Subscriber odom_subscriber_; //these will be set up within the class constructor, hiding these ugly details
     ros::ServiceServer append_path_; // service to receive a path message and append the poses to a queue of poses
     ros::ServiceServer flush_path_; //service to clear out the current queue of path points
-    ros::Publisher des_state_publisher_; // we will publish desired states using this object   
+    ros::Publisher des_state_publisher_; // we will publish desired states using this object  
+    ros::Publisher current_state_publisher_; // we will publish current states using this object  
 
     double dt_; // time step of update rate
     double current_time; //time elapsed in each segment

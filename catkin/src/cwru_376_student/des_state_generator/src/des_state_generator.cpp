@@ -102,6 +102,7 @@ void DesStateGenerator::initializeServices() {
 void DesStateGenerator::initializePublishers() {
     ROS_INFO("Initializing Publishers");
     des_state_publisher_ = nh_.advertise<nav_msgs::Odometry>("desState", 1, true); // publish des state in same format as odometry messages
+    current_state_publisher_ = nh_.advertise<nav_msgs::Odometry>("CurrentState", 1, true); // publish des state in same format as odometry messages
     //add more publishers, as needed
     // note: COULD make minimal_publisher_ a public member function, if want to use it within "main()"
 }
@@ -494,6 +495,7 @@ void DesStateGenerator::update_des_state() {
             des_state_ = update_des_state_halt();   
         }
         des_state_publisher_.publish(des_state_); //send out our message
+        current_state_publisher_.publish(current_odom_);
         updating = false;
     }
 }
