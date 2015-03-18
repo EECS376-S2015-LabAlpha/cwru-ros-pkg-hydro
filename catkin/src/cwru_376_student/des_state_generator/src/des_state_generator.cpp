@@ -14,8 +14,9 @@
 
 #include "des_state_generator.h"
 int ans;
- //used to lock the update values
+ //used to lock the update values, just in case is gets stuck by the time callback hits
  static bool updating;
+ static bool E_stopped;
 
 //double dist_len_accel = 0.5 * (MAX_SPEED * MAX_SPEED) / MAX_ACCEL; //Vinit^2 = Vfinal^2 + 2 a d
 //double dist_omg_accel = 0.5 * (MAX_OMEGA * MAX_OMEGA) / MAX_ALPHA;
@@ -40,6 +41,7 @@ DesStateGenerator::DesStateGenerator(ros::NodeHandle* nodehandle) : nh_(*nodehan
     ROS_INFO("constructor: got an odom message");
     
     dt_ = 1.0/UPDATE_RATE; // time step consistent with update frequency
+    E_stopped = false;
     current_time = 0; //start the clock for each segment
     //initialize variables here, as needed
     
@@ -50,6 +52,7 @@ DesStateGenerator::DesStateGenerator(ros::NodeHandle* nodehandle) : nh_(*nodehan
     current_seg_type_ = HALT; // this should be enough...
     // nonetheless, let's fill in some dummy path segment parameters:    
     current_seg_length_ = 0.0; 
+    radius_over_arc = 0.0;
     current_seg_phi_goal_ = odom_phi_;
     current_seg_ref_point_(0) = odom_x_;   
     current_seg_ref_point_(1) = odom_y_;
@@ -81,6 +84,7 @@ DesStateGenerator::DesStateGenerator(ros::NodeHandle* nodehandle) : nh_(*nodehan
 void DesStateGenerator::initializeSubscribers() {
     ROS_INFO("Initializing Subscribers");
     odom_subscriber_ = nh_.subscribe("/odom", 1, &DesStateGenerator::odomCallback, this); //subscribe to odom messages
+    Estop_subscriber = nh_.subscribe("/motors_enabled",1,&DesStateGenerator::eStopCallback,this);
     // add more subscribers here, as needed
 }
 
@@ -331,7 +335,7 @@ cwru_msgs::PathSegment DesStateGenerator::build_spin_in_place_segment(Eigen::Vec
 }
 
 // INTENDED FOR EXTENSION TO INCLUDE CIRCULAR ARCS...
-// not ready for prime time
+// This is going to work on top of straight line segments with the addition of the phi relative to the speed im going at omega=v/r S=r*theta
 cwru_msgs::PathSegment DesStateGenerator::build_arc_segment(Eigen::Vector2d arc_center, double init_heading, double final_heading, double curvature) {
         cwru_msgs::PathSegment arc_path_segment; // a container for new path segment    
         double delta_phi;
@@ -347,7 +351,7 @@ cwru_msgs::PathSegment DesStateGenerator::build_arc_segment(Eigen::Vector2d arc_
                 delta_phi -= 2.0*M_PI;
             }           
         }
-        arc_path_segment.seg_length = fabs(delta_phi); // rotate this much (magnitude)        
+        arc_path_segment.seg_length = /*radius_over_arc */fabs(delta_phi); // rotate this much (magnitude of S) S = r*thetha        
         arc_path_segment.init_tan_angle = convertPlanarPhi2Quaternion(init_heading);  //start from this heading
         arc_path_segment.curvature = curvature; // rotate in this direction: +1 or -1         
         arc_path_segment.seg_type = cwru_msgs::PathSegment::ARC;   
@@ -384,6 +388,17 @@ cwru_msgs::PathSegment DesStateGenerator::build_line_segment(Eigen::Vector2d v1,
         return  line_path_segment;
 }
 
+void eStopCallback(const std_msgs::Bool::ConstPtr& estop) {
+    // stop requesting a velocity if hardware e-stop is active
+    if (estop->data == true) { 
+        E_stopped = true;
+        current_seg_length_ = current_seg_length_ - ;
+
+    }
+    else { 
+        E_stopped = false;
+    }
+}
 
 // this function takes a path_segment object and fills in member variables, for
 //  iterative re-use by "update_des_state"
@@ -479,7 +494,7 @@ void DesStateGenerator::unpack_next_path_segment() {
     
 // no arguments--uses values in member variables 
 void DesStateGenerator::update_des_state() {
-    if(!updating)
+    if(!updating && !E_stopped)
     {
         updating = true;
         current_time = current_time + dt_; //updated the time elapsed
@@ -490,7 +505,9 @@ void DesStateGenerator::update_des_state() {
         case SPIN_IN_PLACE:
             des_state_ = update_des_state_spin();
             break;
-        case ARC:  // not implemented; set segment type to HALT
+        case ARC: 
+            des_state_ = update_des_state_arc();
+            break;
         default:  
             des_state_ = update_des_state_halt();   
         }
@@ -586,6 +603,49 @@ nav_msgs::Odometry DesStateGenerator::update_des_state_spin() {
     return desired_state;         
 }
 
+///TODO: FIX!!!
+nav_msgs::Odometry DesStateGenerator::update_des_state_arc() {
+    nav_msgs::Odometry desired_state; // fill in this message and return it
+    // but we will also update member variables:
+    // need to update these values:
+    //    current_seg_length_to_go_, current_seg_phi_des_, current_seg_xy_des_ 
+    //    current_speed_des_, current_omega_des_
+     
+    current_speed_des_ = compute_speed_profile(); //USE VEL PROFILING, with this we only care about how fast we're going and the arc r so that we can calculate the ramping in the z with it
+    current_omega_des_ = current_speed_des_ / radius_over_arc;
+    
+    double delta_s = current_speed_des_*dt_; //incremental forward move distance; a scalar
+    
+    current_seg_length_to_go_ -= delta_s; // plan to move forward by this much
+    ROS_INFO("update_des_state_lineseg: current_segment_length_to_go_ = %f",current_seg_length_to_go_);     
+    if (current_seg_length_to_go_ < LENGTH_TOL) { // check if done with this move
+        // done with line segment;
+        current_seg_type_ = HALT;
+        current_seg_xy_des_ = current_seg_ref_point_ + current_seg_tangent_vec_*current_seg_length_;
+        current_seg_phi_des_ =  current_seg_init_tan_angle_ + sgn(current_seg_curvature_)*current_seg_length_;  
+        current_seg_length_to_go_=0.0;
+        current_speed_des_ = 0.0;
+        current_path_seg_done_ = true; 
+        
+        ROS_INFO("update_des_state_lineseg: done with translational motion commands");
+    }
+    else { // not done with translational move yet--step forward
+        // based on distance covered, compute current desired x,y; use scaled vector from v1 to v2 
+        current_seg_xy_des_ = (atan(1)*4 - ((current_seg_length_ - current_seg_length_to_go_) / radius_over_arc)/2);//180 degrees - theta /2 to get angle of triangle with circle of radius radius_over_arc
+        current_seg_xy_des_ = current_seg_ref_point_ + current_seg_tangent_vec_*(current_seg_length_ - current_seg_length_to_go_);   
+        current_seg_phi_des_ = current_seg_init_tan_angle_ + sgn(current_seg_curvature_)*(current_seg_length_ - current_seg_length_to_go_);
+    }
+
+    // fill in components of desired-state message:
+    desired_state.twist.twist.linear.x =current_speed_des_;
+    desired_state.twist.twist.angular.z = current_omega_des_;
+    desired_state.pose.pose.position.x = current_seg_xy_des_(0);
+    desired_state.pose.pose.position.y = current_seg_xy_des_(1);
+    desired_state.pose.pose.orientation = convertPlanarPhi2Quaternion(current_seg_phi_des_);
+    desired_state.header.stamp = ros::Time::now();
+    return desired_state; 
+}
+
 nav_msgs::Odometry DesStateGenerator::update_des_state_halt() {
     nav_msgs::Odometry desired_state; // fill in this message and return it
     // fill in components of desired-state message from most recent odom message
@@ -603,7 +663,7 @@ nav_msgs::Odometry DesStateGenerator::update_des_state_halt() {
 }
 
 double DesStateGenerator::ramp_vel(double segment_length, double a_max, double max_vel){
-    
+    //check if the rampup can occur within the specified time
     if((.5 * max_vel * max_vel / a_max) < (segment_length / 2))
     {
         double ramp_up_stop_time = max_vel/a_max;

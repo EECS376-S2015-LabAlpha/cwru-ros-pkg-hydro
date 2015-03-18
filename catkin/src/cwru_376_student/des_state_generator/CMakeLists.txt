@@ -18,7 +18,7 @@ add_definitions(${EIGEN_DEFINITIONS})
 # cs_add_libraries(my_lib src/my_lib.cpp)   
 
 # Executables
-cs_add_executable(destination_state_generator src/des_state_generator.cpp)
+# cs_add_executable(destination_state_generator src/des_state_generator.cpp)
 cs_add_executable(path_sender src/path_sender.cpp)
 cs_add_executable(path_sender_starting_pen src/path_sender_starting_pen.cpp)
 # cs_add_executable(example src/example.cpp)
