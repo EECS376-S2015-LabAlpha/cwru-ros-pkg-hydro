@@ -11,15 +11,18 @@ LidarSpace::LidarSpace(ros::NodeHandle* nodehandle):nh_(*nodehandle) {
 
 void LidarSpace::initializeSubscribers() {
     ROS_INFO("Initialize Subscribers");
-    ros::Subscriber laser_sub_ = nh_.subscribe("/base_laser1_scan", 1,
+    laser_sub_1 = nh_.subscribe("/base_laser1_scan", 1,
                                                 &LidarSpace::LaserCallback, 
                                                 this);
+    laser_sub_2 = nh_.subscribe("/laser/scan", 1,
+                                            &LidarSpace::LaserCallback, 
+                                            this);
     ROS_INFO("subscribers initialized.");
 }
 
 void LidarSpace::initializePublishers() {
     ROS_INFO("Initialize Publishers");
-    ros::Publisher lidar_out_ = nh_.advertise<lidar_space_detection::LidarSpaceMsg>("/lidar_spaces", 1, true);
+    lidar_out_ = nh_.advertise<lidar_space_detection::LidarSpaceMsg>("/lidar_spaces", 1, true);
     ROS_INFO("publishers initialized.");
 }
 
@@ -62,6 +65,7 @@ void LidarSpace::LaserCallback(const sensor_msgs::LaserScan& scan) {
         }
         // put the slice i list into the list of lists
         new_slice.spaces = current_slice;
+        ROS_INFO("slice %d has size %d", i, (int) new_slice.spaces.size());
         new_slices.push_back(new_slice);
     }
     // publish the lists for every level.
