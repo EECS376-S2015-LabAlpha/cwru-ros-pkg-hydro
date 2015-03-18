@@ -15,7 +15,7 @@
 #include "des_state_generator.h"
 int ans;
  //used to lock the update values
-    static bool updating;
+ static bool updating;
 
 //double dist_len_accel = 0.5 * (MAX_SPEED * MAX_SPEED) / MAX_ACCEL; //Vinit^2 = Vfinal^2 + 2 a d
 //double dist_omg_accel = 0.5 * (MAX_OMEGA * MAX_OMEGA) / MAX_ALPHA;
@@ -40,6 +40,7 @@ DesStateGenerator::DesStateGenerator(ros::NodeHandle* nodehandle) : nh_(*nodehan
     ROS_INFO("constructor: got an odom message");
     
     dt_ = 1.0/UPDATE_RATE; // time step consistent with update frequency
+    current_time = 0; //start the clock for each segment
     //initialize variables here, as needed
     
     des_state_ = update_des_state_halt(); // construct a command state from current odom, + zero speed/spin
@@ -388,9 +389,11 @@ cwru_msgs::PathSegment DesStateGenerator::build_line_segment(Eigen::Vector2d v1,
 void DesStateGenerator::unpack_next_path_segment() {   
     cwru_msgs::PathSegment path_segment;
      ROS_INFO("unpack_next_path_segment: ");
+     current_time = 0.0; //reset the segment elapsed time
     if (segment_queue_.empty()) {
         ROS_INFO("no more segments in the path-segment queue");
         process_new_vertex(); //build and enqueue more path segments, if possible
+
     }
     if (waiting_for_vertex_) {       
         //we need more path segments.  Do we have another path vertex available?
@@ -478,6 +481,7 @@ void DesStateGenerator::update_des_state() {
     if(!updating)
     {
         updating = true;
+        current_time = current_time + dt_; //updated the time elapsed
         switch (current_seg_type_) {
         case LINE: 
             des_state_ = update_des_state_lineseg();          
@@ -596,106 +600,46 @@ nav_msgs::Odometry DesStateGenerator::update_des_state_halt() {
     return desired_state;         
 }
 
-double DesStateGenerator::compare_to_scheduled_vel(double odom_vel,double scheduled_vel,double a_max){
-    double new_cmd_vel;
-    if (odom_vel < scheduled_vel) {  // maybe we halted, e.g. due to estop or obstacle;
-        // may need to ramp up to v_max; do so within accel limits
-        double v_test = odom_vel + a_max*dt_; // if callbacks are slow, this could be abrupt
-        // operator:  c = (a>b) ? a : b;
-        new_cmd_vel = (v_test < scheduled_vel) ? v_test : scheduled_vel; //choose lesser of two options
-        ROS_INFO("goin faster from %f to %f with v_test %f, a_max %f, and dt_ %f", odom_vel, new_cmd_vel, v_test, a_max, dt_);
-        // this prevents overshooting scheduled_vel
-    } else 
-    if (odom_vel > scheduled_vel) { //travelling too fast--this could be trouble
-        // ramp down to the scheduled velocity.  However, scheduled velocity might already be ramping down at a_max.
-        // need to catch up, so ramp down even faster than a_max.  Try 1.2*a_max.
-        ROS_INFO("odom vel: %f; sched vel: %f",odom_vel,scheduled_vel); //debug/analysis output; can comment this out
-        
-        double v_test = odom_vel - 1.2 * a_max*dt_; //moving too fast--try decelerating faster than nominal a_max
+double DesStateGenerator::ramp_vel(double segment_length, double a_max, double max_vel){
+    
+    if((.5 * max_vel * max_vel / a_max) < (segment_length / 2))
+    {
+        double ramp_up_stop_time = max_vel/a_max;
+        double distance_in_cont_vel = (segment_length - (max_vel * max_vel / a_max));
+        double max_vel_stop_time = ramp_up_stop_time + distance_in_cont_vel / max_vel;
 
-        new_cmd_vel = (v_test > scheduled_vel) ? v_test : scheduled_vel; // choose larger of two options...don't overshoot scheduled_vel
-    } else {
-        new_cmd_vel = scheduled_vel; //silly third case: this is already true, if here.  Issue the scheduled velocity
-        ROS_INFO("silly scheduled case");
+        if(current_time < ramp_up_stop_time){
+            return a_max * current_time;
+        }
+        else if(current_time < max_vel_stop_time){
+            return max_vel;
+        }
+        else{
+            return max_vel - a_max * (current_time - max_vel_stop_time);
+        }
     }
-    return new_cmd_vel;
+    else {
+        double ramp_up_stop_time = sqrt(segment_length / a_max);
+        double max_vel_in_ramp_up = ramp_up_stop_time * a_max;
+        if(current_time < ramp_up_stop_time){
+            return a_max * current_time;
+        }
+        else{
+            return max_vel_in_ramp_up - a_max * (current_time - ramp_up_stop_time);
+        }
+    }
 }
 
 //Lets grab the current vel and adjust it with the appropriate values
 double DesStateGenerator::compute_speed_profile() {
-    double dist_len_accel;
-    if(odem_acc_x != 0)
-        dist_len_accel = 0.5 * (odom_vel_ * odom_vel_) / odem_acc_x; //with the current speed this is how long it will take to halt
-    else dist_len_accel = 999999999999;
-    
 
-    double next_vel = 0;
-    ROS_INFO("Have %f to go and start stopping at %f",current_seg_length_to_go_, dist_len_accel);
-    if (current_seg_length_to_go_<= 0.0) { // at goal, or overshot; stop!
-        next_vel=0.0;
-        ROS_INFO("Halting");
-    }
-    else if (current_seg_length_to_go_ <= dist_len_accel) { //possibly should be braking to a halt
-        // dist = 0.5*a*t_halt^2; so t_halt = sqrt(2*dist/a);   v = a*t_halt
-        // so v = a*sqrt(2*dist/a) = sqrt(2*dist*a)
-        next_vel = sqrt(2 * current_seg_length_to_go_ * MAX_ACCEL);
-
-        if(current_seg_length_to_go_/next_vel > TIME_TOL) { //We need to see if its already in the break zone but not going fast enough
-            next_vel = MAX_SPEED;
-            ROS_INFO("Its going too slow");
-        }
-
-        ROS_INFO("braking zone: v_sched = %f",next_vel);
-    }
-    else { // not ready to decel, so target vel is v_max, either accel to it or hold it
-        next_vel = MAX_SPEED;
-        ROS_INFO("Rampup or hold with dist_len_accel %f",dist_len_accel);
-    }
-
-    next_vel = compare_to_scheduled_vel(odom_vel_,next_vel,MAX_ACCEL);
-
-    return next_vel;
+    return ramp_vel(current_seg_length_,MAX_ACCEL,MAX_SPEED);
 }
 
 // Lets do the same with the omega
 double DesStateGenerator::compute_omega_profile() {
 
-    double next_rot_vel = 0;
-    ROS_INFO("***odom_omega_ = %f",odom_omega_);
-    double odom_omega_abs = fabs(odom_omega_ );//speed
-    double dist_omg_accel;
-    if(odem_acc_z != 0)
-    dist_omg_accel = 0.5 * (odom_omega_abs * odom_omega_abs) / odem_acc_z; //with the current speed this is how long it will take to halt
-    else dist_omg_accel = 999999999999;
-    double current_seg_phi_to_go_ = fabs(current_seg_phi_goal_ - odom_phi_);
-
-    if (current_seg_phi_to_go_<= (MAX_OMEGA / (2 * UPDATE_RATE))) { // we need to account for the error at the refresh rate of the fastest possible speed. Once in the possitive and once in the negative. at goal, or overshot; stop!
-        next_rot_vel=0.0;
-        ROS_INFO("Halting");
-    }
-    else if (current_seg_phi_to_go_ <= dist_omg_accel) { //possibly should be braking to a halt
-        // dist = 0.5*a*t_halt^2; so t_halt = sqrt(2*dist/a);   v = a*t_halt
-        // so v = a*sqrt(2*dist/a) = sqrt(2*dist*a)
-        next_rot_vel = sqrt(2 * current_seg_phi_to_go_ * MAX_ALPHA)/2;
-
-        if(current_seg_phi_to_go_/next_rot_vel > TIME_TOL){
-            next_rot_vel = MAX_OMEGA;
-            ROS_INFO("Its going too slow");
-        }
-
-        ROS_INFO("braking zone: v_sched = %f",next_rot_vel);
-    }
-    else { // not ready to decel, so target vel is v_max, either accel to it or hold it
-        next_rot_vel = MAX_OMEGA;
-        ROS_INFO("Rampup or hold with dist_omg_accel %f, odom_omega_abs %f",dist_omg_accel, odom_omega_abs);
-
-    }
-
-    next_rot_vel = compare_to_scheduled_vel(odom_omega_abs,next_rot_vel,MAX_ALPHA);
-
-    double des_omega = sgn(current_seg_curvature_) * next_rot_vel;
-    ROS_INFO("~~~compute_omega_profile: des_omega = %f",des_omega);
-    return des_omega; // spin in direction of closest rotation to target heading
+    return sgn(current_seg_curvature_) * ramp_vel(fabs(current_seg_phi_goal_ - current_seg_init_tan_angle_),MAX_ALPHA,MAX_OMEGA);; // spin in direction of closest rotation to target heading
 }
 
 int main(int argc, char** argv) {

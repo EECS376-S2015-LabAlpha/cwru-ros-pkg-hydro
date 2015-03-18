@@ -110,6 +110,7 @@ private:
     ros::Publisher des_state_publisher_; // we will publish desired states using this object   
 
     double dt_; // time step of update rate
+    double current_time; //time elapsed in each segment
     std::queue<geometry_msgs::PoseStamped> path_queue_; //a C++ "queue" object, stores vertices as Pose points in a FIFO queue; receive these via appendPath service
     std::queue<cwru_msgs::PathSegment> segment_queue_; // path segment objects--as generated from crude polyline path (above)
 
@@ -190,7 +191,7 @@ private:
     // they should also be smart enough to recognize E-stops, etc.
     double compute_speed_profile();
     double compute_omega_profile(); 
-    double compare_to_scheduled_vel(double odom_vel,double scheduled_vel,double a_max);   
+    double ramp_vel(double segment_length, double a_max, double max_vel);   
     
     // these are "crawler" functions.  Given a current path segment, they update desired state objects
     // and publish the resulting desired state;
