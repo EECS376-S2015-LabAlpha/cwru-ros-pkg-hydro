@@ -1,0 +1,6 @@
+<launch>
+  <node name="steeringController" pkg="steering_old_jpc87" type="simple_steering_old" />
+  <node name="path_planner" pkg="path_planner" type="path_planner" />
+  <node name="desStateGenerator" pkg="des_state_generator" type="path_sender" />
+  <node name="lidar_space_detection" pkg="lidar_space_detection" type="lidar_space_detection" />
+</launch>
