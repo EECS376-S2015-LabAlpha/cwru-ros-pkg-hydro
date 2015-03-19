@@ -1,6 +1,6 @@
-// example_des_state_generator.h header file //
-// wsn; Feb, 2015
-// include this file in "example_des_state_generator.cpp"
+// path_planner.h header file //
+// jxh602, wcb38; Feb, 2015
+// include this file in "path_planner.cpp"
 
 // here's a good trick--should always do this with header files:
 // create a unique mnemonic for this header file, so it will get included if needed,
