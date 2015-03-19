@@ -105,7 +105,7 @@ private:
     ros::NodeHandle nh_; // we will need this, to pass between "main" and constructor
     // some objects to support subscriber, service, and publisher
     ros::Subscriber odom_subscriber_; //these will be set up within the class constructor, hiding these ugly details
-    ros::Subscriber estop_sub
+    ros::Subscriber Estop_subscriber; //This will listen for the E-stop messages coming
     ros::ServiceServer append_path_; // service to receive a path message and append the poses to a queue of poses
     ros::ServiceServer flush_path_; //service to clear out the current queue of path points
     ros::Publisher des_state_publisher_; // we will publish desired states using this object  
@@ -162,6 +162,7 @@ private:
 
     //prototypes for subscription callbacks
     void odomCallback(const nav_msgs::Odometry& odom_rcvd);
+    void eStopCallback(const std_msgs::Bool::ConstPtr& estop);
     
     //prototypes for service callbacks 
     bool flushPathCallback(cwru_srv::simple_bool_service_messageRequest& request, cwru_srv::simple_bool_service_messageResponse& response);
@@ -181,6 +182,7 @@ private:
 
     // helper functions for the above: how to construct line and spin path segments
     cwru_msgs::PathSegment build_line_segment(Eigen::Vector2d v1, Eigen::Vector2d v2);
+    cwru_msgs::PathSegment build_arc_segment(Eigen::Vector2d arc_center, double init_heading, double final_heading, double curvature);
     cwru_msgs::PathSegment build_spin_in_place_segment(Eigen::Vector2d v1, double init_heading, double des_heading);
     
     //interpret path segments:
@@ -201,6 +203,7 @@ private:
     // with the latest map_to_odom transform
     nav_msgs::Odometry update_des_state_lineseg();
     nav_msgs::Odometry update_des_state_spin();
+    nav_msgs::Odometry update_des_state_arc();
     nav_msgs::Odometry update_des_state_halt();
 
 }; // note: a class definition requires a semicolon at the end of the definition

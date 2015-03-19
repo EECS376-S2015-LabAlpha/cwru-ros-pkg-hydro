@@ -388,12 +388,12 @@ cwru_msgs::PathSegment DesStateGenerator::build_line_segment(Eigen::Vector2d v1,
         return  line_path_segment;
 }
 
-void eStopCallback(const std_msgs::Bool::ConstPtr& estop) {
+void DesStateGenerator::eStopCallback(const std_msgs::Bool::ConstPtr& estop) {
     // stop requesting a velocity if hardware e-stop is active
     if (estop->data == true) { 
         E_stopped = true;
-        current_seg_length_ = current_seg_length_ - ;
-
+        current_seg_length_ = current_seg_length_to_go_;
+        current_time = 0;
     }
     else { 
         E_stopped = false;
@@ -438,6 +438,9 @@ void DesStateGenerator::unpack_next_path_segment() {
             segment_queue_.pop(); //remove this segment from the queue
         // unpack the new segment:
     
+    //TODO: This bit is so that we dont stop unless we have to
+
+
     // given a path segment; populate member vars for current segment
     // the following are segment parameter values, unchanging while traversing the segment:
     current_seg_type_ = path_segment.seg_type;
@@ -468,7 +471,10 @@ void DesStateGenerator::unpack_next_path_segment() {
             ROS_INFO("unpacking a spin-in-place segment");
             current_seg_phi_goal_= current_seg_init_tan_angle_ + sgn(current_seg_curvature_)*current_seg_length_;
             break;
-        case ARC:  // not implemented; set segment type to HALT
+        case ARC:
+            ROS_INFO("unpacking a ARC segment");
+            //We dont care about setting a phi_goal since we actually already computed this through the segment length by giving a radius of the circle
+            break;
         default:  
             ROS_WARN("segment type not defined");
             current_seg_type_=HALT;
@@ -619,21 +625,35 @@ nav_msgs::Odometry DesStateGenerator::update_des_state_arc() {
     current_seg_length_to_go_ -= delta_s; // plan to move forward by this much
     ROS_INFO("update_des_state_lineseg: current_segment_length_to_go_ = %f",current_seg_length_to_go_);     
     if (current_seg_length_to_go_ < LENGTH_TOL) { // check if done with this move
+        double traversed_theta = (current_seg_length_ / radius_over_arc);
+        
+        double radius_theta = atan(1)*4 - traversed_theta / 2;
+        double third_side_trig = 2 * radius_over_arc * radius_over_arc * (1 - cos(radius_theta));//180 degrees - theta /2 to get angle of triangle with circle of radius radius_over_arc
         // done with line segment;
         current_seg_type_ = HALT;
-        current_seg_xy_des_ = current_seg_ref_point_ + current_seg_tangent_vec_*current_seg_length_;
-        current_seg_phi_des_ =  current_seg_init_tan_angle_ + sgn(current_seg_curvature_)*current_seg_length_;  
         current_seg_length_to_go_=0.0;
         current_speed_des_ = 0.0;
         current_path_seg_done_ = true; 
+
+        current_seg_xy_des_(0) = third_side_trig * (current_seg_xy_des_(0) * cos(atan(1)*2 - radius_theta) - current_seg_xy_des_(1) * sin(atan(1)*2 - radius_theta));
+        current_seg_xy_des_(1) = third_side_trig * (current_seg_xy_des_(0) * sin(atan(1)*2 - radius_theta) + current_seg_xy_des_(1) * cos(atan(1)*2 - radius_theta));
+
+        current_seg_phi_des_ = current_seg_init_tan_angle_ + sgn(current_seg_curvature_)*traversed_theta;
         
         ROS_INFO("update_des_state_lineseg: done with translational motion commands");
     }
     else { // not done with translational move yet--step forward
         // based on distance covered, compute current desired x,y; use scaled vector from v1 to v2 
-        current_seg_xy_des_ = (atan(1)*4 - ((current_seg_length_ - current_seg_length_to_go_) / radius_over_arc)/2);//180 degrees - theta /2 to get angle of triangle with circle of radius radius_over_arc
-        current_seg_xy_des_ = current_seg_ref_point_ + current_seg_tangent_vec_*(current_seg_length_ - current_seg_length_to_go_);   
-        current_seg_phi_des_ = current_seg_init_tan_angle_ + sgn(current_seg_curvature_)*(current_seg_length_ - current_seg_length_to_go_);
+        //atan(1)*4 = pi
+        double traversed_theta = ((current_seg_length_ - current_seg_length_to_go_) / radius_over_arc);
+
+        double radius_theta = atan(1)*4 - traversed_theta / 2;
+        double third_side_trig = 2 * radius_over_arc * radius_over_arc * (1 - cos(radius_theta));//180 degrees - theta /2 to get angle of triangle with circle of radius radius_over_arc
+
+        current_seg_xy_des_(0) = third_side_trig * (current_seg_xy_des_(0) * cos(atan(1)*2 - radius_theta) - current_seg_xy_des_(1) * sin(atan(1)*2 - radius_theta));
+        current_seg_xy_des_(1) = third_side_trig * (current_seg_xy_des_(0) * sin(atan(1)*2 - radius_theta) + current_seg_xy_des_(1) * cos(atan(1)*2 - radius_theta));
+
+        current_seg_phi_des_ = current_seg_init_tan_angle_ + sgn(current_seg_curvature_)*traversed_theta;
     }
 
     // fill in components of desired-state message:
