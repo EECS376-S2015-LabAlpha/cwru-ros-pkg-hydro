@@ -130,12 +130,18 @@ private:
 
     //Values from the lidar scan, will get filled in by lidar callback
     lidar_space_detection::LidarSpace currentScan;
-    lidar_space_detection::LidarSpaceSlice lidarSlices[];
-    geometry_msgs::Vector3 lidarSpaces[];
+    //lidar_space_detection::LidarSpaceSlice lidarSlices[];
+    //geometry_msgs::Vector3 lidarSpaces[];
+    std::vector<lidar_space_detection::LidarSpaceSlice> lidarSlices;
+    std::vector<geometry_msgs::Vector3> lidarSpaces;
     double distIncrement;
     double lidarX;
     double lidarY;
     double lidarZ;
+    bool mustChangePath;
+
+    geometry_msgs::PoseStamped map_pose_stamped;
+
 
     //path description values:  these are all with respect to odom coordinates
     // these values get set once upon construction of the current path segment:
