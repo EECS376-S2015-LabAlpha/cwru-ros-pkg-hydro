@@ -1,5 +1,5 @@
-//example_des_generator.cpp:
-//wsn, Feb 2015
+// path_planner.h header file //
+// jxh602, wcb38; Feb, 2015
 //implementation of class to generate a stream of desired states
 
 // can test the flush-path service manually with 
