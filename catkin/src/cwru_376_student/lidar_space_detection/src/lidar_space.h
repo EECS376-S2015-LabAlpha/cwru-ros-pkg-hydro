@@ -23,6 +23,7 @@ private:
 
 	ros::Subscriber laser_sub_1;
 	ros::Subscriber laser_sub_2;
+	ros::Subscriber laser_sub_3;
 	ros::Publisher lidar_out_;
 
 	sensor_msgs::LaserScan last_scan;

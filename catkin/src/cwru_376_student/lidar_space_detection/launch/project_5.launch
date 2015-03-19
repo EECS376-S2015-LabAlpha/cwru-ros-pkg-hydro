@@ -3,4 +3,6 @@
   <node name="path_planner" pkg="path_planner" type="path_planner" />
   <node name="desStateGenerator" pkg="des_state_generator" type="path_sender" />
   <node name="lidar_space_detection" pkg="lidar_space_detection" type="lidar_space_detection" />
+
+  <node name="rviz" pkg="rviz" type="rviz" />
 </launch>
