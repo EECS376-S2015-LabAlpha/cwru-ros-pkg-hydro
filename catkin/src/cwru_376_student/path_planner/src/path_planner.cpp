@@ -57,6 +57,7 @@ DesStateGenerator::DesStateGenerator(ros::NodeHandle* nodehandle) : nh_(*nodehan
         std::cout << ".";
         ros::spinOnce();
     }
+    ROS_WARN("Segfaul4");
     ROS_INFO("constructor: got an odom message");
     
     dt_ = 1.0/UPDATE_RATE; // time step consistent with update frequency
@@ -311,22 +312,21 @@ void DesStateGenerator::process_new_vertex() {
        
     std::vector<cwru_msgs::PathSegment> vec_of_path_segs; // container for path segments to be built
     
-
-    //std::cout<<"SegFault 1"<<std::endl;
-    ROS_WARN("SegFault1");
+    
 
     geometry_msgs::Vector3 bestVec; //Initialize the largest-gap vector to the first one
-    ROS_WARN("SegFault2");
+
     //Before we build the path segments, we have to check the lidar data to make sure nothing is in the way:
     //Calculate the size of the lidarSlices array: by iterating through the lidarSpaces array and incrementing a counter
     int numSlices = 0;
     bool foundObstacle = false; //A boolean that will help "break" out of the outer for-loop as soon as we find an obstacle
 
-    
+    ROS_WARN("Segfaul1");
     for (lidar_space_detection::LidarSpaceSlice dummySlice : lidarSlices) {
         numSlices++;
     }
     //Now iterate over the slices 
+    ROS_WARN("Segfaul2");
     for (int i = 0; i < numSlices && !foundObstacle; i++) {
         //For each slice, populate an array of vector3 objects 
         int j = 0;
@@ -345,6 +345,7 @@ void DesStateGenerator::process_new_vertex() {
         }
         
     }
+    ROS_WARN("Segfaul3");
 
     //Check if the largest gap is big enough for the robot to fit through
     if(bestVec.z < 1.5) {
@@ -372,9 +373,10 @@ void DesStateGenerator::process_new_vertex() {
         for (int i=0;i<vec_of_path_segs.size();i++) {
             segment_queue_.push(vec_of_path_segs[i]);
         }
-    }
+
+    } 
     //Otherwise, we just continue on the straight path from start_pose to goal_pose
-    else {
+    //else {
         // the following will construct two path segments: spin to reorient, then lineseg to reach goal point
         vec_of_path_segs = build_spin_then_line_path_segments(start_pose_wrt_odom, goal_pose_wrt_odom.pose);
 
@@ -386,7 +388,7 @@ void DesStateGenerator::process_new_vertex() {
             segment_queue_.push(vec_of_path_segs[i]);
         }
     // we have now updated the segment queue; these segments should get processed before they get "stale"
-    }
+    //}
     
 
 
@@ -426,13 +428,14 @@ void DesStateGenerator::process_new_vertex() {
     double des_heading = convertPlanarQuat2Phi(line_path_segment.init_tan_angle);
     
     // populate a PathSegment object corresponding to spin-in-place from initial heading to lineseg heading:
+    
     spin_path_segment = build_spin_in_place_segment(v1, init_heading, des_heading);
     
     //put these path segments in a vector: first spin, then move along lineseg:
-    //vec_of_path_segs.push_back(spin_path_segment);
+    vec_of_path_segs.push_back(spin_path_segment);
     vec_of_path_segs.push_back(line_path_segment);
     std::cout<<"vec of pathsegs[0] ="<<vec_of_path_segs[0]<<std::endl;
-    std::cout<<"vec of pathsegs[1] ="<<vec_of_path_segs[1]<<std::endl;    
+    std::cout<<"vec of pathsegs[1] ="<<vec_of_path_segs[1]<<std::endl;   
     return vec_of_path_segs;
     }
  
@@ -693,6 +696,7 @@ nav_msgs::Odometry DesStateGenerator::update_des_state_spin() {
     }
     else { // not done yet--rotate some more
         // based on angular distance covered, compute current desired heading
+
         // consider specified curvature ==> rotation direction to goal
         current_seg_phi_des_ = current_seg_init_tan_angle_ + sgn(current_seg_curvature_)*(current_seg_length_ - current_seg_length_to_go_);       
     }
