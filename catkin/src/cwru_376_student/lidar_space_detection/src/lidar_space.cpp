@@ -46,14 +46,18 @@ void LidarSpace::LaserCallback(const sensor_msgs::LaserScan& scan) {
     lidar_space_detection::LidarSpaceSlice new_slice;
 
     //BigO(10n) runtime
-    for(int i = 1; i < (int) std::min((int) range_max, 10); i++) {
+    for(int i = 1; i <= (int) std::min((int) range_max, 10); i++) {
         current_slice.clear();
         start_index = 0;
         min_space = min_spacing((double) (i), angle_increment);
+        //ROS_INFO("min space %d", min_space);
 
         for(int j = 0; j < (int) scan.ranges.size(); j++){
             //process each ping
-            if(scan.ranges[j] < i) {
+            if(scan.ranges[j] < i || j == scan.ranges.size() -1 ) {
+                if(start_index == 0) {
+                    //ROS_INFO("start stop @ %f",scan.ranges[j]);
+                }
                 // if it is within the next slice
                 if (j - start_index < min_space) {
                     start_index = j;
@@ -63,12 +67,15 @@ void LidarSpace::LaserCallback(const sensor_msgs::LaserScan& scan) {
                     geometry_msgs::Vector3 option = convert_to_vec(start_index, j, angle_min, angle_increment, 
                                                                     (double) (i));
                     current_slice.push_back(option);
+                    start_index = j;
                 }
             }
         }
         // put the slice i list into the list of lists
         new_slice.spaces = current_slice;
-        ROS_INFO("slice %d has size %d", i, (int) new_slice.spaces.size());
+        if((int) new_slice.spaces.size() > 1) {
+            ROS_INFO("slice %d has size %d", i, (int) new_slice.spaces.size());
+        }
         new_slices.push_back(new_slice);
     }
     // publish the lists for every level.
@@ -78,7 +85,7 @@ void LidarSpace::LaserCallback(const sensor_msgs::LaserScan& scan) {
 }
 
 int LidarSpace::min_spacing(double radius, double increment) {
-    return (int) ((.3/radius)/increment);
+    return (int) (1.5*((.3/radius)/increment));
 }
 
 geometry_msgs::Vector3 LidarSpace::convert_to_vec(int start_index, int end_index, double angle_min, double angle_increment, 
