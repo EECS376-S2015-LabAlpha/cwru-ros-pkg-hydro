@@ -23,7 +23,7 @@ int ans;
 
 DesStateGenerator::DesStateGenerator(ros::NodeHandle* nodehandle) : nh_(*nodehandle) { // constructor
     ROS_INFO("in class constructor of DesStateGenerator");
-    
+    mustChangePath = false;
     /*tfListener_ = new tf::TransformListener;  //create a transform listener
     
     // wait to start receiving valid tf transforms between map and odom:
@@ -57,7 +57,7 @@ DesStateGenerator::DesStateGenerator(ros::NodeHandle* nodehandle) : nh_(*nodehan
         std::cout << ".";
         ros::spinOnce();
     }
-    ROS_WARN("Segfaul4");
+    //ROS_WARN("Segfaul4");
     ROS_INFO("constructor: got an odom message");
     
     dt_ = 1.0/UPDATE_RATE; // time step consistent with update frequency
@@ -145,10 +145,39 @@ void DesStateGenerator::lidarCallback(const lidar_space_detection::LidarSpace& l
     int i = 0;
     //Copy over each lidar slice into an array: lidarSlices[]
     for(lidar_space_detection::LidarSpaceSlice slice: lidar_rcvd.ranges) {
-        lidarSlices[i] = slice;
-        i++;
+        //lidarSlices[i] = slice;
+        lidarSlices.push_back(slice);
+        //i++;
     }
     distIncrement = lidar_rcvd.dist_increment;
+
+    int numSlices = 0;
+    bool foundObstacle = false; //A boolean that will help "break" out of the outer for-loop as soon as we find an obstacle
+
+    //ROS_WARN("Segfaul1");
+    for (lidar_space_detection::LidarSpaceSlice dummySlice : lidarSlices) {
+        numSlices++;
+    }
+    //Now iterate over the slices 
+    //ROS_WARN("Segfaul2");
+    for (int i = 0; i < numSlices && !foundObstacle; i++) {
+        //For each slice, populate an array of vector3 objects 
+        int j = 0;
+        for (geometry_msgs::Vector3 vec : lidarSlices[i].spaces) {
+            lidarSpaces.push_back(vec);
+            j++;
+        }
+        //Check if there's more than one vector3 for this slice, this will mean that there is an obstacle and that 
+        //lidar pings were split into multiple ones
+        //ROS_WARN("Segfaul3");
+        if (j > 1) {
+            //We have found an obstacle, so call process_new_vertex to change our path
+            mustChangePath = true;
+            process_new_vertex();
+            
+        }
+        
+    }
 
 }
 
@@ -288,8 +317,13 @@ void DesStateGenerator::process_new_vertex() {
     ROS_INFO("there are %d vertices in the queue", npts);
     //if here, get the next vertex from the queue, convert to odom coords, and set up path segment params
     waiting_for_vertex_ = false; //will build new path segments from most recent path vertex
-    geometry_msgs::PoseStamped map_pose_stamped = path_queue_.front(); // note: we have a copy of front of queue, but we have not popped it from the queue yet
-    path_queue_.pop(); // remove this subgoal from the queue
+    if(!mustChangePath) {
+        map_pose_stamped = path_queue_.front(); // note: we have a copy of front of queue, but we have not popped it from the queue yet
+        path_queue_.pop(); // remove this subgoal from the queue
+    }
+    else {
+        mustChangePath = false;
+    }
 
     // we want to build path segments to take us from the current pose to the new goal pose
     // the goal pose is transformed to odom coordinates at the last moment, to minimize odom drift issues
@@ -321,20 +355,22 @@ void DesStateGenerator::process_new_vertex() {
     int numSlices = 0;
     bool foundObstacle = false; //A boolean that will help "break" out of the outer for-loop as soon as we find an obstacle
 
-    ROS_WARN("Segfaul1");
+    //ROS_WARN("Segfaul1");
     for (lidar_space_detection::LidarSpaceSlice dummySlice : lidarSlices) {
         numSlices++;
     }
     //Now iterate over the slices 
-    ROS_WARN("Segfaul2");
+    //ROS_WARN("Segfaul2");
     for (int i = 0; i < numSlices && !foundObstacle; i++) {
         //For each slice, populate an array of vector3 objects 
         int j = 0;
         for (geometry_msgs::Vector3 vec : lidarSlices[i].spaces) {
-            lidarSpaces[j++] = vec;
+            lidarSpaces.push_back(vec);
+            j++;
         }
         //Check if there's more than one vector3 for this slice, this will mean that there is an obstacle and that 
         //lidar pings were split into multiple ones
+        //ROS_WARN("Segfaul3");
         if (j > 1) {
             //Iterate through the lidarSpaces array and find the vector3 with the largest gap (z component)
             foundObstacle = true;
@@ -345,7 +381,7 @@ void DesStateGenerator::process_new_vertex() {
         }
         
     }
-    ROS_WARN("Segfaul3");
+    
 
     //Check if the largest gap is big enough for the robot to fit through
     if(bestVec.z < 1.5) {
@@ -376,7 +412,7 @@ void DesStateGenerator::process_new_vertex() {
 
     } 
     //Otherwise, we just continue on the straight path from start_pose to goal_pose
-    //else {
+    else {
         // the following will construct two path segments: spin to reorient, then lineseg to reach goal point
         vec_of_path_segs = build_spin_then_line_path_segments(start_pose_wrt_odom, goal_pose_wrt_odom.pose);
 
@@ -388,7 +424,7 @@ void DesStateGenerator::process_new_vertex() {
             segment_queue_.push(vec_of_path_segs[i]);
         }
     // we have now updated the segment queue; these segments should get processed before they get "stale"
-    //}
+    }
     
 
 
@@ -522,7 +558,7 @@ void DesStateGenerator::unpack_next_path_segment() {
     cwru_msgs::PathSegment path_segment;
      ROS_INFO("unpack_next_path_segment: ");
     if (segment_queue_.empty()) {
-        ROS_WARN("no more segments in the path-segment queue");
+        //ROS_WARN("no more segments in the path-segment queue");
         process_new_vertex(); //build and enqueue more path segments, if possible
     }
     if (waiting_for_vertex_) {       
