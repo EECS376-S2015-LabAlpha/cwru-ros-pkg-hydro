@@ -630,10 +630,16 @@ nav_msgs::Odometry DesStateGenerator::update_des_state_arc() {
         double radius_theta = atan(1)*4 - traversed_theta / 2;
         double third_side_trig = 2 * radius_over_arc * radius_over_arc * (1 - cos(radius_theta));//180 degrees - theta /2 to get angle of triangle with circle of radius radius_over_arc
         // done with line segment;
-        current_seg_type_ = HALT;
-        current_seg_length_to_go_=0.0;
-        current_speed_des_ = 0.0;
-        current_path_seg_done_ = true; 
+
+        /*if(!continuous){
+            current_seg_type_ = HALT;
+            current_seg_length_to_go_=0.0;
+            current_speed_des_ = 0.0;
+            current_path_seg_done_ = true; 
+        }
+        else{
+
+        } */
 
         current_seg_xy_des_(0) = third_side_trig * (current_seg_xy_des_(0) * cos(atan(1)*2 - radius_theta) - current_seg_xy_des_(1) * sin(atan(1)*2 - radius_theta));
         current_seg_xy_des_(1) = third_side_trig * (current_seg_xy_des_(0) * sin(atan(1)*2 - radius_theta) + current_seg_xy_des_(1) * cos(atan(1)*2 - radius_theta));
