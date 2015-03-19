@@ -18,7 +18,7 @@ void LidarSpace::initializeSubscribers() {
                                             &LidarSpace::LaserCallback, 
                                             this);
 
-    laser_sub_3 = nh_.subs cribe("/scan", 1,
+    laser_sub_3 = nh_.subscribe("/scan", 1,
                                         &LidarSpace::LaserCallback, 
                                         this);
     ROS_INFO("subscribers initialized.");
