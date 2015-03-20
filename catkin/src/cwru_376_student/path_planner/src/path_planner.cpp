@@ -24,6 +24,7 @@ int ans;
 DesStateGenerator::DesStateGenerator(ros::NodeHandle* nodehandle) : nh_(*nodehandle) { // constructor
     ROS_INFO("in class constructor of DesStateGenerator");
     mustChangePath = false;
+    lidarCollisionCounter = 0;
     /*tfListener_ = new tf::TransformListener;  //create a transform listener
     
     // wait to start receiving valid tf transforms between map and odom:
@@ -170,8 +171,9 @@ void DesStateGenerator::lidarCallback(const lidar_space_detection::LidarSpace& l
         //Check if there's more than one vector3 for this slice, this will mean that there is an obstacle and that 
         //lidar pings were split into multiple ones
         //ROS_WARN("Segfaul3");
-        if (j > 1) {
+        if (j > 1 && lidarCollisionCounter < 1) {
             //We have found an obstacle, so call process_new_vertex to change our path
+            lidarCollisionCounter++;
             mustChangePath = true;
             process_new_vertex();
             
@@ -321,9 +323,7 @@ void DesStateGenerator::process_new_vertex() {
         map_pose_stamped = path_queue_.front(); // note: we have a copy of front of queue, but we have not popped it from the queue yet
         path_queue_.pop(); // remove this subgoal from the queue
     }
-    else {
-        mustChangePath = false;
-    }
+
 
     // we want to build path segments to take us from the current pose to the new goal pose
     // the goal pose is transformed to odom coordinates at the last moment, to minimize odom drift issues
@@ -411,6 +411,12 @@ void DesStateGenerator::process_new_vertex() {
         }
 
     } 
+
+    if(mustChangePath && foundObstacle) {
+        unpack_next_path_segment();
+        update_des_state();
+        mustChangePath = false;
+    }
     //Otherwise, we just continue on the straight path from start_pose to goal_pose
     else {
         // the following will construct two path segments: spin to reorient, then lineseg to reach goal point
