@@ -8,7 +8,6 @@ SteeringController::SteeringController(ros::NodeHandle* nodehandle):nh_(*nodehan
     ROS_INFO("in class constructor of SteeringController");
     initializeSubscribers();
     initializePublishers();
-    initializeServices();
     
     odom_phi_ = 1000.0; // put in impossible value for heading; test this value to make sure we have received a viable odom message
     ROS_INFO("waiting for valid odom message...");
@@ -18,27 +17,6 @@ SteeringController::SteeringController(ros::NodeHandle* nodehandle):nh_(*nodehan
         ros::spinOnce();
     }
     ROS_INFO("constructor: got an odom message");    
-    
-    tfListener_ = new tf::TransformListener; 
- 
-    bool tferr=true;
-    ROS_INFO("waiting for tf...");
-    while (tferr) {
-        tferr=false;
-        try {
-                //try to lookup transform from target frame "odom" to source frame "map"
-            //The direction of the transform returned will be from the target_frame to the source_frame. 
-             //Which if applied to data, will transform data in the source_frame into the target_frame. See tf/CoordinateFrameConventions#Transform_Direction
-                tfListener_->lookupTransform("odom", "map", ros::Time(0), mapToOdom_);
-            } catch(tf::TransformException &exception) {
-                ROS_ERROR("%s", exception.what());
-                tferr=true;
-                ros::Duration(0.5).sleep(); // sleep for half a second
-                ros::spinOnce();                
-            }   
-    }
-    ROS_INFO("tf is good");
-    // from now on, tfListener will keep track of transforms from map frame to target frame
     
     //initialize desired state, in case this is not yet being published adequately
     des_state_ = current_odom_;  // use the current odom state
@@ -62,26 +40,13 @@ SteeringController::SteeringController(ros::NodeHandle* nodehandle):nh_(*nodehan
 
 }
 
-//member helper function to set up subscribers;
 void SteeringController::initializeSubscribers() {
     ROS_INFO("Initializing Subscribers: odom and desState");
-    odom_subscriber_ = nh_.subscribe("/current_state", 1, &SteeringController::currentStateCB, this); //subscribe to odom messages
-    // add more subscribers here, as needed
-    des_state_subscriber_ = nh_.subscribe("/desired_state", 1, &SteeringController::desStateCallback, this); // for desired state messages
+    // Subscribe to des state and current state from desired state generator. This way, only des_state changes for amcl
+    cur_state_subscriber_ = nh_.subscribe("/CurrentState", 1, &SteeringController::currentStateCB, this);
+    des_state_subscriber_ = nh_.subscribe("/desState", 1, &SteeringController::desStateCallback, this);
 }
 
-//member helper function to set up services:
-// similar syntax to subscriber, required for setting up services outside of "main()"
-void SteeringController::initializeServices()
-{
-    ROS_INFO("Initializing Services: exampleMinimalService");
-    simple_service_ = nh_.advertiseService("exampleMinimalService",
-                                                   &SteeringController::serviceCallback,
-                                                   this);  
-    // add more services here, as needed
-}
-
-//member helper function to set up publishers;
 void SteeringController::initializePublishers()
 {
     ROS_INFO("Initializing Publishers: cmd_vel and cmd_vel_stamped");
@@ -153,14 +118,6 @@ double SteeringController::convertPlanarQuat2Phi(geometry_msgs::Quaternion quate
     double quat_w = quaternion.w;
     double phi = 2.0 * atan2(quat_z, quat_w); // cheap conversion from quaternion to heading for planar motion
     return phi;
-}
-
-//member function implementation for a service callback function
-// could do something useful with this
-bool SteeringController::serviceCallback(cwru_srv::simple_bool_service_messageRequest& request, cwru_srv::simple_bool_service_messageResponse& response) {
-    ROS_INFO("service callback activated");
-    response.resp = true; // boring, but valid response info
-    return true;
 }
 
 // HERE IS THE BIG DEAL: USE DESIRED AND ACTUAL STATE TO COMPUTE AND PUBLISH CMD_VEL
