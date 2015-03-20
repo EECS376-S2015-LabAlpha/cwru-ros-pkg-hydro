@@ -138,6 +138,7 @@ private:
     double lidarX;
     double lidarY;
     double lidarZ;
+    double lidarCollisionCounter;
     bool mustChangePath;
 
     geometry_msgs::PoseStamped map_pose_stamped;
