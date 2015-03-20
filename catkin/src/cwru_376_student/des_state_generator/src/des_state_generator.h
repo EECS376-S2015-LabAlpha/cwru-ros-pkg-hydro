@@ -114,7 +114,7 @@ private:
     double dt_; // time step of update rate
     double current_time; //time elapsed in each segment
     std::queue<geometry_msgs::PoseStamped> path_queue_; //a C++ "queue" object, stores vertices as Pose points in a FIFO queue; receive these via appendPath service
-    std::queue<cwru_msgs::PathSegment> segment_queue_; // path segment objects--as generated from crude polyline path (above)
+    std::vector<cwru_msgs::PathSegment> segment_queue_; // path segment objects--as generated from crude polyline path (above)
 
     geometry_msgs::Pose last_map_pose_rcvd_;
     geometry_msgs::Pose new_pose_des_;
@@ -139,6 +139,8 @@ private:
     double current_seg_init_tan_angle_;  
     double current_seg_curvature_;
     double current_seg_length_; 
+    double total_length_to_go;
+    double total_length;
     int current_seg_type_; 
     double current_seg_phi_goal_;
     Eigen::Vector2d current_seg_tangent_vec_; 

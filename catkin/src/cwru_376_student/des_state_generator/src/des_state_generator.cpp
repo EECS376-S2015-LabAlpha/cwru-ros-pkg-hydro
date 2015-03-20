@@ -52,6 +52,8 @@ DesStateGenerator::DesStateGenerator(ros::NodeHandle* nodehandle) : nh_(*nodehan
     current_seg_type_ = HALT; // this should be enough...
     // nonetheless, let's fill in some dummy path segment parameters:    
     current_seg_length_ = 0.0; 
+    total_length_to_go = 0.0;
+    total_length = 0.0;
     radius_over_arc = 0.0;
     current_seg_phi_goal_ = odom_phi_;
     current_seg_ref_point_(0) = odom_x_;   
@@ -134,7 +136,7 @@ bool DesStateGenerator::flushPathCallback(cwru_srv::simple_bool_service_messageR
     ROS_INFO("service flush-Path callback activated");
     while (!path_queue_.empty()) {
         ROS_INFO("clearing the path queue...");
-        std::cout << ' ' << path_queue_.front();
+        //std::cout << ' ' << path_queue_.front();
         path_queue_.pop();
     }
     response.resp = true; // boring, but valid response info
@@ -264,7 +266,7 @@ void DesStateGenerator::process_new_vertex() {
     // Or more simply, could add a segpath builder that ONLY re-orients, yielding a single path seg
     // regardless, take however many resulting path segments and push them into a pathseg queue:
     for (int i=0;i<vec_of_path_segs.size();i++) {
-        segment_queue_.push(vec_of_path_segs[i]);
+        segment_queue_.push_back(vec_of_path_segs[i]);
     }
    // we have now updated the segment queue; these segments should get processed before they get "stale"
 }
@@ -393,6 +395,8 @@ void DesStateGenerator::eStopCallback(const std_msgs::Bool::ConstPtr& estop) {
     if (estop->data == true) { 
         E_stopped = true;
         current_seg_length_ = current_seg_length_to_go_;
+        total_length = total_length_to_go - current_seg_length_ + current_seg_length_to_go_;
+        total_length_to_go = total_length;
         current_time = 0;
     }
     else { 
@@ -433,9 +437,20 @@ void DesStateGenerator::unpack_next_path_segment() {
      // let's pop it from the queue:
         int npts = segment_queue_.size();
         ROS_INFO("there are %d segments in the path-segment queue", npts);       
-        path_segment = segment_queue_.front(); // grab the next one;
-        std::cout << ' ' << path_segment; // nice...this works
-            segment_queue_.pop(); //remove this segment from the queue
+        path_segment = segment_queue_.back(); // grab the next one;
+        //Here we decide if the length is just for this line or arc, or larger in which case we dont actually slow down in between
+        if(total_length_to_go < LENGTH_TOL){
+            cwru_msgs::PathSegment temp_segment = path_segment;
+            double current_segment = 1;
+            while(temp_segment.seg_type != SPIN_IN_PLACE){
+                total_length = total_length + temp_segment.seg_length;
+                current_segment++;
+                temp_segment = segment_queue_[segment_queue_.size() - current_segment];
+            }
+            total_length_to_go = total_length;
+        }
+        //std::cout << ' ' << path_segment; // nice...this works
+        segment_queue_.pop_back(); //remove this segment from the queue
         // unpack the new segment:
     
     //TODO: This bit is so that we dont stop unless we have to
@@ -543,14 +558,18 @@ nav_msgs::Odometry DesStateGenerator::update_des_state_lineseg() {
     double delta_s = current_speed_des_*dt_; //incremental forward move distance; a scalar
     
     current_seg_length_to_go_ -= delta_s; // plan to move forward by this much
+    total_length_to_go -= delta_s;
     ROS_INFO("update_des_state_lineseg: current_segment_length_to_go_ = %f",current_seg_length_to_go_);     
     if (current_seg_length_to_go_ < LENGTH_TOL) { // check if done with this move
         // done with line segment;
-        current_seg_type_ = HALT;
-        current_seg_xy_des_ = current_seg_ref_point_ + current_seg_tangent_vec_*current_seg_length_; // specify destination vertex as exact, current goal
+        if(total_length_to_go < LENGTH_TOL){
+            current_seg_type_ = HALT;
+            current_speed_des_ = 0.0;
+        }
         current_seg_length_to_go_=0.0;
-        current_speed_des_ = 0.0;  // 
-        current_path_seg_done_ = true; 
+        current_path_seg_done_ = true;
+        current_seg_xy_des_ = current_seg_ref_point_ + current_seg_tangent_vec_*current_seg_length_; // specify destination vertex as exact, current goal
+
         ROS_INFO("update_des_state_lineseg: done with translational motion commands");
     }
     else { // not done with translational move yet--step forward
@@ -623,6 +642,7 @@ nav_msgs::Odometry DesStateGenerator::update_des_state_arc() {
     double delta_s = current_speed_des_*dt_; //incremental forward move distance; a scalar
     
     current_seg_length_to_go_ -= delta_s; // plan to move forward by this much
+    total_length_to_go -= delta_s;
     ROS_INFO("update_des_state_lineseg: current_segment_length_to_go_ = %f",current_seg_length_to_go_);     
     if (current_seg_length_to_go_ < LENGTH_TOL) { // check if done with this move
         double traversed_theta = (current_seg_length_ / radius_over_arc);
@@ -631,16 +651,13 @@ nav_msgs::Odometry DesStateGenerator::update_des_state_arc() {
         double third_side_trig = 2 * radius_over_arc * radius_over_arc * (1 - cos(radius_theta));//180 degrees - theta /2 to get angle of triangle with circle of radius radius_over_arc
         // done with line segment;
 
-        /*if(!continuous){
+        if(total_length_to_go < LENGTH_TOL){
             current_seg_type_ = HALT;
-            current_seg_length_to_go_=0.0;
             current_speed_des_ = 0.0;
-            current_path_seg_done_ = true; 
         }
-        else{
 
-        } */
-
+        current_seg_length_to_go_=0.0;
+        current_path_seg_done_ = true; 
         current_seg_xy_des_(0) = third_side_trig * (current_seg_xy_des_(0) * cos(atan(1)*2 - radius_theta) - current_seg_xy_des_(1) * sin(atan(1)*2 - radius_theta));
         current_seg_xy_des_(1) = third_side_trig * (current_seg_xy_des_(0) * sin(atan(1)*2 - radius_theta) + current_seg_xy_des_(1) * cos(atan(1)*2 - radius_theta));
 
@@ -721,7 +738,7 @@ double DesStateGenerator::ramp_vel(double segment_length, double a_max, double m
 //Lets grab the current vel and adjust it with the appropriate values
 double DesStateGenerator::compute_speed_profile() {
 
-    return ramp_vel(current_seg_length_,MAX_ACCEL,MAX_SPEED);
+    return ramp_vel(total_length,MAX_ACCEL,MAX_SPEED);
 }
 
 // Lets do the same with the omega
