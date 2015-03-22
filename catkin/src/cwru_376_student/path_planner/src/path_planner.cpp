@@ -230,6 +230,13 @@ double DesStateGenerator::convertPlanarQuat2Phi(geometry_msgs::Quaternion quater
     double quat_z = quaternion.z;
     double quat_w = quaternion.w;
     double phi = 2.0 * atan2(quat_z, quat_w); // cheap conversion from quaternion to heading for planar motion
+    //Make sure that the returned angle is within +- 2 * pi
+    /*while (phi < -6.2831853) {
+        phi += 6.2831853;
+    }
+    while (phi > 6.2831853) {
+        phi -= 6.2831853;
+    }*/
     return phi;
 }
 
@@ -340,7 +347,10 @@ void DesStateGenerator::process_new_vertex() {
     
     // USE THIS for init w/rt odometry feedback:
     start_pose_wrt_odom = odom_pose_; // value refreshed in member var by odom callback
-
+    double currentPhi = convertPlanarQuat2Phi(start_pose_wrt_odom.orientation);
+    double endPhi = convertPlanarQuat2Phi(goal_pose_wrt_odom.pose.orientation);
+    //ROS_WARN("Starting phi is: %f", currentPhi);
+    //ROS_WARN("Goal phi is: %f",  endPhi);
     // or USE THIS  for init w/rt most recently computed desired state
     //start_pose_wrt_odom =  des_state_.pose.pose;   
        
@@ -349,6 +359,7 @@ void DesStateGenerator::process_new_vertex() {
     
 
     geometry_msgs::Vector3 bestVec; //Initialize the largest-gap vector to the first one
+    bestVec.z = 0;
 
     //Before we build the path segments, we have to check the lidar data to make sure nothing is in the way:
     //Calculate the size of the lidarSlices array: by iterating through the lidarSpaces array and incrementing a counter
@@ -362,6 +373,8 @@ void DesStateGenerator::process_new_vertex() {
     //Now iterate over the slices 
     //ROS_WARN("Segfaul2");
     for (int i = 0; i < numSlices && !foundObstacle; i++) {
+        //Make sure the lidarSpaces is initially empty; we don't want previous slices' data to get into the current one
+        lidarSpaces.clear();
         //For each slice, populate an array of vector3 objects 
         int j = 0;
         for (geometry_msgs::Vector3 vec : lidarSlices[i].spaces) {
@@ -396,8 +409,19 @@ void DesStateGenerator::process_new_vertex() {
         //Add code here to convert Buck's vector3 into and odom pose
         geometry_msgs::Pose adjustedPose;
         adjustedPose.position.z = start_pose_wrt_odom.position.z;
-        adjustedPose.position.y = start_pose_wrt_odom.position.y + (bestVec.x * cos(bestVec.y));
-        adjustedPose.position.y = start_pose_wrt_odom.position.x + (bestVec.x * sin(bestVec.y));
+        //Do the magic here: calculate the actual angle for the detour, and convert from polar to rect coordinates
+        double currentPhi = convertPlanarQuat2Phi(odom_pose_.orientation);
+        ROS_WARN("Lidar angle: %f", bestVec.y);
+        ROS_WARN("Current Phi: %f", currentPhi);
+        double adjustedPhi = currentPhi - bestVec.y;
+        ROS_WARN("BestVec.x = %f", bestVec.x);
+        adjustedPose.position.y = start_pose_wrt_odom.position.y + (bestVec.x * cos(adjustedPhi));
+        adjustedPose.position.y = start_pose_wrt_odom.position.x + (bestVec.x * sin(adjustedPhi));
+        //adjustedPose.position.y = start_pose_wrt_odom.position.y + (bestVec.x * cos(bestVec.y));
+        //adjustedPose.position.y = start_pose_wrt_odom.position.x + (bestVec.x * sin(bestVec.y));
+
+        //We have to calculate the robot's current heading in order to figure out what the detour point should be
+        
         adjustedPose.orientation = start_pose_wrt_odom.orientation;
         //First, add in an intermediate pose that will tell the robot to avoid the obstacle by moving to the side of the obstacle
         vec_of_path_segs = build_spin_then_line_path_segments(start_pose_wrt_odom, adjustedPose);
