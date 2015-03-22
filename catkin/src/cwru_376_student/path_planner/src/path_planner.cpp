@@ -391,7 +391,7 @@ void DesStateGenerator::process_new_vertex() {
     
     //At this point, we either found an obstacle, and have a bestVec that indicates where we should go, or there is no
     //obstacle, and we should just continue with the old path
-    if (foundObstacle) {
+    if (foundObstacle && mustChangePath) {
         ROS_WARN("FOUND AN OBSTACLE");
         //Add code here to convert Buck's vector3 into and odom pose
         geometry_msgs::Pose adjustedPose;
@@ -410,13 +410,10 @@ void DesStateGenerator::process_new_vertex() {
             segment_queue_.push(vec_of_path_segs[i]);
         }
 
-    } 
-
-    if(mustChangePath && foundObstacle) {
         unpack_next_path_segment();
         update_des_state();
         mustChangePath = false;
-    }
+    } 
     //Otherwise, we just continue on the straight path from start_pose to goal_pose
     else {
         // the following will construct two path segments: spin to reorient, then lineseg to reach goal point
