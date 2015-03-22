@@ -128,6 +128,8 @@ private:
     double odom_phi_;
     geometry_msgs::Quaternion odom_quat_;
 
+
+    
     //Values from the lidar scan, will get filled in by lidar callback
     lidar_space_detection::LidarSpace currentScan;
     //lidar_space_detection::LidarSpaceSlice lidarSlices[];
