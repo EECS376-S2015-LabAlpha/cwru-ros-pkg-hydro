@@ -45,6 +45,7 @@ const bool DEBUG_MODE=false; // change this for display/break-points
 
 #include <tf/transform_listener.h> //for transforms
 
+
 //Segment types 
 const int HALT = 0;
 const int LINE = cwru_msgs::PathSegment::LINE;
@@ -52,7 +53,7 @@ const int ARC = cwru_msgs::PathSegment::ARC;
 const int SPIN_IN_PLACE = cwru_msgs::PathSegment::SPIN_IN_PLACE;
 
 // dynamic limitations
-const double MAX_SPEED = 0.5; // m/sec; adjust this
+/*const double MAX_SPEED = 0.5; // m/sec; adjust this
 const double MAX_OMEGA = 0.5; //1.0; // rad/sec; adjust this
 const double MAX_ACCEL = 1.0; // m/sec^2; adjust this
 const double MAX_ALPHA = 1.0; // rad/sec^2; adjust this
@@ -60,7 +61,32 @@ const double MAX_ALPHA = 1.0; // rad/sec^2; adjust this
 const double LENGTH_TOL = 0.05; // tolerance for path; adjust this
 const double HEADING_TOL = 0.05; // heading tolerance; adjust this
 
-const double UPDATE_RATE = 50.0; // choose the desired-state publication update rate
+const double UPDATE_RATE = 50.0; // choose the desired-state publication update rate*/
+
+
+
+
+// dynamic limitations
+const double MAX_SPEED = 1; // m/sec; adjust this
+const double MAX_OMEGA = 0.5; //1.0; // rad/sec; adjust this
+const double MAX_ACCEL = 1; // m/sec^2; adjust this
+const double MAX_ALPHA = 0.25; // rad/sec^2; adjust this
+
+const double LENGTH_TOL = 0.001; // tolerance for path; adjust this
+const double HEADING_TOL = 0.005; // heading tolerance; adjust this
+
+const double TIME_TOL = 1; // Time for the computed decceleration to resolve
+
+const double UPDATE_RATE = 100.0; // choose the desired-state publication update rate
+
+
+
+
+
+
+
+
+
 
 // define a class, including a constructor, member variables and member functions
 
@@ -104,12 +130,15 @@ private:
     ros::NodeHandle nh_; // we will need this, to pass between "main" and constructor
     // some objects to support subscriber, service, and publisher
     ros::Subscriber odom_subscriber_; //these will be set up within the class constructor, hiding these ugly details
-    ros::Subscriber lidar_subscriber_;
+    ros::Subscriber lidar_subscriber_; //Listen to lidar data coming in
+    ros::Subscriber Estop_subscriber; //This will listen for the E-stop messages coming
     ros::ServiceServer append_path_; // service to receive a path message and append the poses to a queue of poses
     ros::ServiceServer flush_path_; //service to clear out the current queue of path points
     ros::Publisher des_state_publisher_; // we will publish desired states using this object   
+    ros::Publisher current_state_publisher_; // we will publish current states using this object  
 
     double dt_; // time step of update rate
+    double current_time; //time elapsed in each segment
     std::queue<geometry_msgs::PoseStamped> path_queue_; //a C++ "queue" object, stores vertices as Pose points in a FIFO queue; receive these via appendPath service
     std::queue<cwru_msgs::PathSegment> segment_queue_; // path segment objects--as generated from crude polyline path (above)
 
@@ -126,6 +155,9 @@ private:
     double odom_x_;
     double odom_y_;
     double odom_phi_;
+    double odem_acc_x;
+    double odem_acc_z;
+    double radius_over_arc;
     geometry_msgs::Quaternion odom_quat_;
 
 
@@ -179,7 +211,7 @@ private:
     //prototypes for subscription callbacks
     void odomCallback(const nav_msgs::Odometry& odom_rcvd);
     void lidarCallback(const lidar_space_detection::LidarSpace& lidar_rcvd);
-
+    void eStopCallback(const std_msgs::Bool::ConstPtr& estop);
 
     //prototypes for service callbacks 
     bool flushPathCallback(cwru_srv::simple_bool_service_messageRequest& request, cwru_srv::simple_bool_service_messageResponse& response);
@@ -212,6 +244,7 @@ private:
     // they should also be smart enough to recognize E-stops, etc.
     double compute_speed_profile();
     double compute_omega_profile();    
+    double ramp_vel(double segment_length, double a_max, double max_vel);
     
     // these are "crawler" functions.  Given a current path segment, they update desired state objects
     // and publish the resulting desired state;
@@ -220,6 +253,7 @@ private:
     // with the latest map_to_odom transform
     nav_msgs::Odometry update_des_state_lineseg();
     nav_msgs::Odometry update_des_state_spin();
+    nav_msgs::Odometry update_des_state_arc();
     nav_msgs::Odometry update_des_state_halt();
 
 }; // note: a class definition requires a semicolon at the end of the definition
