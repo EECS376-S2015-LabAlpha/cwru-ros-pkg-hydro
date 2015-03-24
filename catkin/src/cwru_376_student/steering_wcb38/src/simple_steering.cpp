@@ -212,7 +212,7 @@ void SteeringController::my_clever_steering_algorithm() {
 int main(int argc, char** argv) 
 {
     // ROS set-ups:
-    ros::init(argc, argv, "steeringController"); //node name
+    ros::init(argc, argv, "simple_steering_wcb38"); //node name
 
     ros::NodeHandle nh; // create a node handle; need to pass this to the class constructor
 
