@@ -145,11 +145,11 @@ void SteeringController::my_clever_steering_algorithm() {
     
     
     // DEBUG OUTPUT...
-    ROS_INFO("des_state_phi, odom_phi, heading err = %f, %f, %f", des_state_phi_,odom_phi_,heading_err);
-    ROS_INFO("lateral err, trip dist err = %f, %f",lateral_err,trip_dist_err);
+    ROS_INFO("\ndes_state_phi, odom_phi, heading err \n= %f, %f, %f", des_state_phi_,odom_phi_,heading_err);
+    ROS_INFO("\nlateral err, trip dist err \n= %f, %f",lateral_err,trip_dist_err);
     // DEFINITELY COMMENT OUT ALL cout<< OPERATIONS FOR REAL-TIME CODE
-    std::cout<<des_xy_vec_<<std::endl;
-    std::cout<<odom_xy_vec_<<std::endl;
+    //std::cout<<des_xy_vec_<<std::endl;
+    //std::cout<<odom_xy_vec_<<std::endl;
     // let's put these in a message to publish, for rqt_plot to display
     steering_errs_.data.clear();
     steering_errs_.data.push_back(lateral_err);
@@ -184,6 +184,8 @@ void SteeringController::my_clever_steering_algorithm() {
     // omega_cmd = (theta_desired*2*UPDATE_RATE) - omega_odom
 
     double speed_correction = (-0.5)*atan(1.0*trip_dist_err);
+    
+    
 
     // now we have corrections
     controller_speed = std::max(std::min(1.1*MAX_SPEED, des_state_vel_+speed_correction), 0.0);
@@ -203,6 +205,20 @@ void SteeringController::my_clever_steering_algorithm() {
     // send out our very clever speed/spin commands:
     twist_cmd_.linear.x = controller_speed;
     twist_cmd_.angular.z = controller_omega;
+
+
+    /* Clever commands round 2 */
+
+    twist_cmd_.angular.z = heading_err*(1.0);
+
+    if(heading_err*1.0 < .005 && heading_err*1.0 > -.005) {
+        twist_cmd_.angular.z = 0.0;
+    }
+
+    twist_cmd_.linear.x = current_speed_des_;
+
+    ROS_INFO("\ncorrection: steering | speed \n   %f | %f ", twist_cmd_.angular.z, twist_cmd_.linear.x);
+
     twist_cmd2_.twist = twist_cmd_; // copy the twist command into twist2 message
     twist_cmd2_.header.stamp = ros::Time::now(); // look up the time and put it in the header 
     cmd_publisher_.publish(twist_cmd_);  
