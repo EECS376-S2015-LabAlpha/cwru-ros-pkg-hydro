@@ -225,7 +225,7 @@ geometry_msgs::Pose DesStateGenerator::odom_to_map_pose(geometry_msgs::Pose odom
 void DesStateGenerator::process_new_vertex() {
     if (path_queue_.empty()) { // do nothing
         waiting_for_vertex_ = true;
-        //current_seg_type_ = HALT;
+        current_seg_type_ = HALT;
         return;
     }
     
