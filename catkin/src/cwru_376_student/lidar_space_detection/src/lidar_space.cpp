@@ -44,6 +44,7 @@ void LidarSpace::LaserCallback(const sensor_msgs::LaserScan& scan) {
 
     int start_index = 0;
     int min_space = 0;
+    int max_size = 0;
 
     std::vector<lidar_space_detection::LidarSpaceSlice> new_slices;
     std::vector<geometry_msgs::Vector3> current_slice;
@@ -77,11 +78,15 @@ void LidarSpace::LaserCallback(const sensor_msgs::LaserScan& scan) {
         }
         // put the slice i list into the list of lists
         new_slice.spaces = current_slice;
+        if((int) new_slice.spaces.size() > max_size) {
+            max_size = new_slice.spaces.size();
+        }
         if((int) new_slice.spaces.size() > 1) {
             ROS_INFO("slice %d has size %d", i, (int) new_slice.spaces.size());
         }
         new_slices.push_back(new_slice);
     }
+    //print_output(new_slices, max_size);
     // publish the lists for every level.
     last_publish.ranges = new_slices;
     last_publish.dist_increment = 1.0;
@@ -102,6 +107,25 @@ geometry_msgs::Vector3 LidarSpace::convert_to_vec(int start_index, int end_index
     to_return.z = radius*(end_angle-start_angle);
     return to_return;
 }
+
+/*
+void LidarSpace::print_output(std::vector<lidar_space_detection::LidarSpaceSlice> toPrint, int max_size) {
+    std::stringstream ss;
+    ss << "\n Print Lidar Out";
+    for(int depth = 0; depth < max_size; depth++) {
+        ss << "\n " << depth << " ";
+        for(int index = 0; index < toPrint.size; index++) {
+            if(depth < toPrint[index].size()) {
+                ss << "| " << spaces[depth].y << "," << "| ";
+            }
+            else {
+                ss << "| " << "      " << "| ";
+            }
+        }
+    }
+    ROS_INFO("%s", ss.str().c_str());
+}
+*/
 
 int main(int argc, char **argv) {
     ros::init(argc, argv, "lidar_space_detection"); //name this node

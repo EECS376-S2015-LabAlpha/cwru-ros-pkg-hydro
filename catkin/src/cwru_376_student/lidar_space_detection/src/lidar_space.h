@@ -36,6 +36,8 @@ private:
 
     int min_spacing(double radius, double increment);
 
+   //void LidarSpace::print_output(std::vector<lidar_space_detection::LidarSpaceSlice> toPrint, int max_size);
+
     geometry_msgs::Vector3 convert_to_vec(int start_index, int end_index, double angle_min, double angle_increment, double radius);
 
 };
