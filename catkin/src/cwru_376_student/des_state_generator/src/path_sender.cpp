@@ -61,29 +61,35 @@ int main(int argc, char **argv) {
     
     // fill in the interesting data: (x,y) and phi = location and heading
     //vertex 1:
-    x=5.0;
-    y=5.0;
-    phi=1.5;
+    x=0.25;
+    y=0.0;
+    phi=1.5079;
     ROS_INFO("vertex: x,y,phi = %f, %f %f",x,y,phi);
     vertex.pose = xyPhi2Pose(x,y,phi); //x,y,phi
     path_message.request.path.poses.push_back(vertex);
 
     //vertex 2:
-    x=5.0;
-    y=3.0;
-    phi=0;
+    x=0.25;
+    y=0.25;
+    phi=3.14;
     ROS_INFO("vertex: x,y,phi = %f, %f %f",x,y,phi);
     vertex.pose = xyPhi2Pose(x,y,phi); //x,y,phi  
     path_message.request.path.poses.push_back(vertex);
     
     //vertex 3:
     x=0.0;
-    y=0.0;
-    phi=2.5;
+    y=0.25;
+    phi=-1.5079;
     ROS_INFO("vertex: x,y,phi = %f, %f %f",x,y,phi);
     vertex.pose = xyPhi2Pose(x,y,phi); //x,y,phi  
     path_message.request.path.poses.push_back(vertex);
 
+    x=0.0;
+    y=0.25;
+    phi=0;
+    ROS_INFO("vertex: x,y,phi = %f, %f %f",x,y,phi);
+    vertex.pose = xyPhi2Pose(x,y,phi); //x,y,phi  
+    path_message.request.path.poses.push_back(vertex);
     //transmit this path message:
     if (client.call(path_message)) {
         ROS_INFO("got ack from server");
