@@ -79,7 +79,8 @@ const double TIME_TOL = 1; // Time for the computed decceleration to resolve
 
 const double UPDATE_RATE = 100.0; // choose the desired-state publication update rate
 
-
+bool isFirst = true;
+nav_msgs::Odometry origState;
 
 
 

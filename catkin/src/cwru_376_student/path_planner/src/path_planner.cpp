@@ -127,19 +127,27 @@ void DesStateGenerator::initializePublishers() {
 
 
 void DesStateGenerator::odomCallback(const nav_msgs::Odometry& odom_rcvd) {
+
+    if (isFirst) {
+        origState = odom_rcvd;
+        isFirst = false;
+    }
     // copy some of the components of the received message into member vars
     // we care about speed and spin, as well as position estimates x,y and heading
     current_odom_ = odom_rcvd; // save the entire message
+    current_odom_.pose.pose.position.x -= origState.pose.pose.position.x;
+    current_odom_.pose.pose.position.y -= origState.pose.pose.position.y;
+    current_odom_.pose.pose.orientation = convertPlanarPhi2Quaternion(convertPlanarQuat2Phi(current_odom_.pose.pose.orientation) - convertPlanarQuat2Phi(origState.pose.pose.orientation));
     // but also pick apart pieces, for ease of use
     odom_pose_stamped_.header = odom_rcvd.header;
     odom_pose_ = odom_rcvd.pose.pose;
     odom_vel_ = odom_rcvd.twist.twist.linear.x;
     odom_omega_ = odom_rcvd.twist.twist.angular.z;
-    odom_x_ = odom_rcvd.pose.pose.position.x;
-    odom_y_ = odom_rcvd.pose.pose.position.y;
+    odom_x_ = odom_rcvd.pose.pose.position.x - origState.pose.pose.position.x;
+    odom_y_ = odom_rcvd.pose.pose.position.y - origState.pose.pose.position.y;
     odom_quat_ = odom_rcvd.pose.pose.orientation;
     //odom publishes orientation as a quaternion.  Convert this to a simple heading
-    odom_phi_ = convertPlanarQuat2Phi(odom_quat_); // cheap conversion from quaternion to heading for planar motion
+    odom_phi_ = convertPlanarQuat2Phi(odom_quat_) - convertPlanarQuat2Phi(origState.pose.pose.orientation); // cheap conversion from quaternion to heading for planar motion
 }
 
 void DesStateGenerator::lidarCallback(const lidar_space_detection::LidarSpace& lidar_rcvd) {
