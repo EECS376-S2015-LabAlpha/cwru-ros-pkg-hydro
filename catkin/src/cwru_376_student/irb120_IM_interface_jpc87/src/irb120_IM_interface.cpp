@@ -12,11 +12,11 @@
 #include <vector>
 
 #include <interactive_markers/interactive_marker_server.h>
-#include <irb120_kinematics.h>
 #include <cwru_srv/simple_bool_service_message.h> // this is a pre-defined service message, contained in shared "cwru_srv" package
 #include "trajectory_msgs/JointTrajectory.h"
 #include "trajectory_msgs/JointTrajectoryPoint.h"
 #include <sensor_msgs/JointState.h>
+#include <irb120_kinematics.h>
 
 //callback to subscribe to marker state
 Eigen::Vector3d g_p;
@@ -63,13 +63,13 @@ bool triggerService(cwru_srv::simple_bool_service_messageRequest& request, cwru_
     response.resp = true; // boring, but valid response info
     // grab the most recent IM data and repackage it as an Affine3 matrix to set a target hand pose;
     
+    g_A_flange_desired.translation() = g_p;
+    g_A_flange_desired.linear() = g_R;
     //cout<<"g_p: "<<g_p.transpose()<<endl;
     //cout<<"R: "<<endl;
     //cout<<g_R<<endl;
-    if(!g_trigger)
     g_trigger=true; //inform "main" that we have a new goal!
-    else
-     g_trigger=false; // reset the trigger
+    
     return true;
 }
 
@@ -185,13 +185,11 @@ int main(int argc, char** argv) {
   
     
     int nsolns;
-    g_A_flange_desired.translation() = g_p;
-    g_A_flange_desired.linear() = g_R;
     while(ros::ok()) {
             ros::spinOnce();
             if (g_trigger) {
                 // ooh!  excitement time!  got a new tool pose goal!
-                //g_trigger=false; // reset the trigger
+                g_trigger=false; // reset the trigger
                 //is this point reachable?
                 A_flange_des_DH = g_A_flange_desired;
                 A_flange_des_DH.linear() = g_A_flange_desired.linear()*R_urdf_wrt_DH.transpose();
@@ -206,9 +204,6 @@ int main(int argc, char** argv) {
                     stuff_trajectory(qvec,new_trajectory);
  
                         pub.publish(new_trajectory);
-
-                        g_A_flange_desired.translation() = g_p;
-                        g_A_flange_desired.linear() = g_R;
                 }
             }
             sleep_timer.sleep();    
@@ -217,6 +212,5 @@ int main(int argc, char** argv) {
     
     return 0;
 }
-
 
 
