@@ -11,7 +11,7 @@ SteeringController::SteeringController(ros::NodeHandle* nodehandle):nh_(*nodehan
     
     odom_phi_ = 1000.0; // put in impossible value for heading; test this value to make sure we have received a viable odom message
     ROS_INFO("waiting for valid odom message...");
-    while (odom_phi_ > 500.0) {
+    while (odom_phi_ > 500.0 && ros::ok()) {
         ros::Duration(0.5).sleep(); // sleep for half a second
         std::cout << ".";
         ros::spinOnce();
@@ -158,7 +158,7 @@ void SteeringController::my_clever_steering_algorithm() {
 
     steering_errs_publisher_.publish(steering_errs_); // suitable for plotting w/ rqt_plot
     //END OF DEBUG STUFF
-    
+     
     /* 
         x
         |
@@ -183,7 +183,7 @@ void SteeringController::my_clever_steering_algorithm() {
     // omega_odom + omega_cmd = (theta_desired) * (2 * UPDATE_RATE)
     // omega_cmd = (theta_desired*2*UPDATE_RATE) - omega_odom
 
-    double speed_correction = (-0.5)*atan(1.0*trip_dist_err);
+    double speed_correction = (0.5)*atan(1.0*trip_dist_err);
     
     
 
@@ -209,13 +209,21 @@ void SteeringController::my_clever_steering_algorithm() {
 
     /* Clever commands round 2 */
 
+    if(lateral_err > 1.0 || true) {
+        heading_err = min_dang(des_state_phi_+atan(2*lateral_err) - odom_phi_);
+    }
+    else if(lateral_err < -1.0) {
+        heading_err = min_dang(des_state_phi_-1.5708 - odom_phi_);
+    }
+
     twist_cmd_.angular.z = heading_err*(1.0);
 
     if(heading_err*1.0 < .005 && heading_err*1.0 > -.005) {
         twist_cmd_.angular.z = 0.0;
     }
 
-    twist_cmd_.linear.x = current_speed_des_;
+
+    twist_cmd_.linear.x = des_state_vel_+speed_correction;
 
     ROS_INFO("\ncorrection: steering | speed \n   %f | %f ", twist_cmd_.angular.z, twist_cmd_.linear.x);
 
