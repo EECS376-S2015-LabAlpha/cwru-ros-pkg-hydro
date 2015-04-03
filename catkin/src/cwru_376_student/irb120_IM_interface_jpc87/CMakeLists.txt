@@ -3,7 +3,7 @@ project(irb120_IM_interface_jpc87)
 
 find_package(catkin_simple REQUIRED)
 find_package(Eigen REQUIRED)
-#find_package(irb120_ik REQUIRED)
+find_package(irb120_ik REQUIRED)
 #find_package(example_joint_space_planner REQUIRED)
 include_directories(${Eigen_INCLUDE_DIRS})
 add_definitions(${EIGEN_DEFINITIONS})
