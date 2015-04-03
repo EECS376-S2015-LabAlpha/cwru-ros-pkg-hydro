@@ -216,12 +216,26 @@ void SteeringController::my_clever_steering_algorithm() {
         heading_err = min_dang(des_state_phi_-1.5708 - odom_phi_);
     }
 
-    twist_cmd_.angular.z = heading_err*(1.0);
+    if(heading_err > .2) {
+        heading_err = .2;
+    }
+    if(heading_err < -.2) {
+        heading_err = -.2;
+    }
+
+    twist_cmd_.angular.z = heading_err*(0.5);
 
     if(heading_err*1.0 < .005 && heading_err*1.0 > -.005) {
         twist_cmd_.angular.z = 0.0;
     }
 
+
+    if(speed_correction > .1) {
+        speed_correction = .1;
+    }
+    if(speed_correction < -.1) {
+        speed_correction = -.1;
+    }
 
     twist_cmd_.linear.x = des_state_vel_+speed_correction;
 
