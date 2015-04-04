@@ -19,10 +19,10 @@
 #include <irb120_kinematics.h>
 
 //callback to subscribe to marker state
-Eigen::Vector3d g_p;
-Vectorq6x1 g_q_state;
+Eigen::Vector3d g_p; //where I want to go
+Vectorq6x1 g_q_state; //where I be at
 double g_x,g_y,g_z;
-double frequency = 5.0;
+double frequency = 10.0;
 //geometry_msgs::Quaternion g_quat; // global var for quaternion
 Eigen::Quaterniond g_quat;
 Eigen::Matrix3d g_R;
@@ -32,9 +32,9 @@ using namespace std;
 
 void markerListenerCB(
         const visualization_msgs::InteractiveMarkerFeedbackConstPtr &feedback) {
-    ROS_INFO_STREAM(feedback->marker_name << " is now at "
-            << feedback->pose.position.x << ", " << feedback->pose.position.y
-            << ", " << feedback->pose.position.z);
+    //ROS_INFO_STREAM(feedback->marker_name << " is now at "
+      //      << feedback->pose.position.x << ", " << feedback->pose.position.y
+        //    << ", " << feedback->pose.position.z);
     //copy to global vars:
     g_p[0] = feedback->pose.position.x;
     g_p[1] = feedback->pose.position.y;
@@ -47,10 +47,11 @@ void markerListenerCB(
 }
 
 void jointStateCB(
-const sensor_msgs::JointStatePtr &js_msg) {
+const sensor_msgs::JointStatePtr &js_msg) { //THIS IS NOT GETTING CALLED!!!! I DONT KNOW WHY... FIX!!!
     
     for (int i=0;i<6;i++) {
         g_q_state[i] = js_msg->position[i];
+        ROS_INFO("q_p_state is %f for %d",g_q_state[i],i);
     }
     //cout<<"g_q_state: "<<g_q_state.transpose()<<endl;
     
@@ -60,79 +61,115 @@ const sensor_msgs::JointStatePtr &js_msg) {
 bool triggerService(cwru_srv::simple_bool_service_messageRequest& request, cwru_srv::simple_bool_service_messageResponse& response)
 {
     ROS_INFO("service callback activated");
-    response.resp = true; // boring, but valid response info
-    // grab the most recent IM data and repackage it as an Affine3 matrix to set a target hand pose;
+    response.resp = true; //response
     
     g_A_flange_desired.translation() = g_p;
     g_A_flange_desired.linear() = g_R;
-    //cout<<"g_p: "<<g_p.transpose()<<endl;
-    //cout<<"R: "<<endl;
-    //cout<<g_R<<endl;
-    g_trigger=true; //inform "main" that we have a new goal!
+    g_trigger=true; //flag
     
     return true;
 }
 
-double getTimeTraversalFromJoints(trajectory_msgs::JointTrajectory &new_trajectory,trajectory_msgs::JointTrajectoryPoint &trajectory_point1,trajectory_msgs::JointTrajectoryPoint &trajectory_point2){
+double getTimeTraversalFromJoints(trajectory_msgs::JointTrajectory &new_trajectory,Vectorq6x1 start, Vectorq6x1 end){
     double weight = 0;
-    for(int joints = 0; joints < sizeof(new_trajectory.joint_names); joints++){
-        if(new_trajectory.joint_names[joints] == "joint_1")
-            weight += 6;
-        if(new_trajectory.joint_names[joints] == "joint_2")
-            weight += 5;
-        if(new_trajectory.joint_names[joints] == "joint_3")
-            weight += 4;
-        if(new_trajectory.joint_names[joints] == "joint_4")
-            weight += 3;
-        if(new_trajectory.joint_names[joints] == "joint_5")
-            weight += 2;
-        if(new_trajectory.joint_names[joints] == "joint_6")
-            weight += 1;
-        double duration =  weight * (trajectory_point2.positions[joints] - trajectory_point2.positions[joints]);
-        ROS_INFO("time is %f",duration);
-        return 4.0;
+    double duration = 0;
+    for(int joints = 0; joints < 6; joints++){
+        switch(joints){
+            case 0:         //greatest importance.. go slow on big movements
+                weight = 3;
+                break;
+            case 1:
+                weight = 2;
+                break;
+            case 2:
+                weight = .8;
+                break;
+            default:
+                weight = .2; //we dont really care for the small guys in terms of subdivisions
+        }
+        
+        duration +=  weight * std::abs(start[joints] - end[joints]);
+        
     }
+    ROS_INFO("time is %f",duration);
+    return duration;
 }
 
 //command robot to move to "qvec" using a trajectory message, sent via ROS-I
 void stuff_trajectory( Vectorq6x1 qvec, trajectory_msgs::JointTrajectory &new_trajectory) {
-    
-    trajectory_msgs::JointTrajectoryPoint trajectory_point1;
-    trajectory_msgs::JointTrajectoryPoint trajectory_point2; 
-     
-    
+
     new_trajectory.points.clear();
+
     new_trajectory.joint_names.push_back("joint_1");
     new_trajectory.joint_names.push_back("joint_2");
     new_trajectory.joint_names.push_back("joint_3");
     new_trajectory.joint_names.push_back("joint_4");
     new_trajectory.joint_names.push_back("joint_5");
-    new_trajectory.joint_names.push_back("joint_6");   
+    new_trajectory.joint_names.push_back("joint_6");  
 
-    new_trajectory.header.stamp = ros::Time::now();  
-    
-    trajectory_point1.positions.clear();    
-    trajectory_point2.positions.clear(); 
-    //fill in the points of the trajectory: initially, all home angles
-    for (int ijnt=0;ijnt<6;ijnt++) {
-        trajectory_point1.positions.push_back(g_q_state[ijnt]); // stuff in position commands for 6 joints
-        //should also fill in trajectory_point.time_from_start
-        trajectory_point2.positions.push_back(0.0); // stuff in position commands for 6 joints        
-    }
-    trajectory_point1.time_from_start =    ros::Duration(0);     
+    new_trajectory.header.stamp = ros::Time::now();
 
-    new_trajectory.points.push_back(trajectory_point1); // add this single trajectory point to the trajectory vector   
-    
-    // fill in the target pose: really should fill in a sequence of poses leading to this goal
-    for (int ijnt=0;ijnt<6;ijnt++) {
-                trajectory_point2.positions[ijnt] = qvec[ijnt];
+    double time_to_traverse = getTimeTraversalFromJoints(new_trajectory,g_q_state,qvec);
+    double dt = .2; //Lets split things up
+    double points = time_to_traverse/dt; //take our calculated time it takes and subdivide into points
+
+    for (int point=0;point<points;point++) {
+        trajectory_msgs::JointTrajectoryPoint trajectory_point;
+        trajectory_point.positions.clear(); 
+        for (int ijnt=0;ijnt<6;ijnt++) {
+            trajectory_point.positions.push_back(g_q_state[ijnt] + ((g_q_state[ijnt] - qvec[ijnt]) * point/points)); //for each dt add another point
         }  
-    double time_to_traverse = getTimeTraversalFromJoints(new_trajectory,trajectory_point1,trajectory_point2);
 
-   trajectory_point2.time_from_start =    ros::Duration(time_to_traverse);  
+        trajectory_point.time_from_start =  ros::Duration(dt);
+        new_trajectory.points.push_back(trajectory_point); // append this point to trajectory
+    }  
     
+}
 
-    new_trajectory.points.push_back(trajectory_point2); // append this point to trajectory
+int findOptimalSolution (std::vector<Vectorq6x1> solutions){
+    if(sizeof(solutions) < 50) //lets make sure we dont have infinity solutions.... 
+    {
+        double maxweight = 0;
+        double bestindex = 0;
+        for(int sol = 0; sol < sizeof(solutions); sol++){
+            double weight = 0;
+            for(int joints = 0; joints < 6; joints++){ //TODO: Fix values according to a table postions 
+                switch(joints){
+                    case 0:
+                        if(solutions[sol][joints] > 0) //if we have the arm pointing in a certain direction we like lets promote it
+                            weight = weight + 5;
+                        break;
+                    case 1:
+                        if(solutions[sol][joints] > 0) //if we have the arm pointing in a certain direction we like lets promote it
+                            weight = weight + 0;
+                        break;
+                    case 2:
+                        if(solutions[sol][joints] > 0) //if we have the arm pointing in a certain direction we like lets promote it
+                            weight = weight + 0;
+                        break;
+                    case 3:
+                        if(solutions[sol][joints] > 0) //if we have the arm pointing in a certain direction we like lets promote it
+                            weight = weight + 0;
+                        break;
+                    case 4:
+                        if(solutions[sol][joints] > 0) //if we have the arm pointing in a certain direction we like lets promote it
+                            weight = weight + 0;
+                        break;
+                    case 5:
+                        if(solutions[sol][joints] > 0) //if we have the arm pointing in a certain direction we like lets promote it
+                            weight = weight + 5;
+                        break;
+                }
+            }
+
+            if(weight > maxweight){
+                maxweight = weight;
+                bestindex = sol;
+            }
+        }
+        return bestindex;
+    }
+    else return 0;
 }
 
 
@@ -193,14 +230,15 @@ int main(int argc, char** argv) {
                 //is this point reachable?
                 A_flange_des_DH = g_A_flange_desired;
                 A_flange_des_DH.linear() = g_A_flange_desired.linear()*R_urdf_wrt_DH.transpose();
-                cout<<"R des DH: "<<endl;
-                cout<<A_flange_des_DH.linear()<<endl;
+                //cout<<"R des DH: "<<endl;
+                //cout<<A_flange_des_DH.linear()<<endl;
                 nsolns = ik_solver.ik_solve(A_flange_des_DH);
                 ROS_INFO("there are %d solutions",nsolns);
 
                 if (nsolns>0) {      
-                    ik_solver.get_solns(q6dof_solns);  
-                    qvec = q6dof_solns[0]; // arbitrarily choose first soln                    
+                    ik_solver.get_solns(q6dof_solns);
+
+                    qvec = q6dof_solns[findOptimalSolution(q6dof_solns)]; // arbitrarily choose first soln                    
                     stuff_trajectory(qvec,new_trajectory);
  
                         pub.publish(new_trajectory);
