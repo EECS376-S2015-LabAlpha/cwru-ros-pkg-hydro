@@ -51,7 +51,7 @@ const sensor_msgs::JointStatePtr &js_msg) { //THIS IS NOT GETTING CALLED!!!! I D
     
     for (int i=0;i<6;i++) {
         g_q_state[i] = js_msg->position[i];
-        ROS_INFO("q_p_state is %f for %d",g_q_state[i],i);
+        //ROS_INFO("q_p_state is %f for %d",g_q_state[i],i);
     }
     //cout<<"g_q_state: "<<g_q_state.transpose()<<endl;
     
@@ -70,7 +70,7 @@ bool triggerService(cwru_srv::simple_bool_service_messageRequest& request, cwru_
     return true;
 }
 
-double getTimeTraversalFromJoints(trajectory_msgs::JointTrajectory &new_trajectory,Vectorq6x1 start, Vectorq6x1 end){
+double getTimeTraversalFromJoints(Vectorq6x1 end){
     double weight = 0;
     double duration = 0;
     for(int joints = 0; joints < 6; joints++){
@@ -88,7 +88,7 @@ double getTimeTraversalFromJoints(trajectory_msgs::JointTrajectory &new_trajecto
                 weight = .2; //we dont really care for the small guys in terms of subdivisions
         }
         
-        duration +=  weight * std::abs(start[joints] - end[joints]);
+        duration +=  weight * std::abs(g_q_state[joints] - end[joints]);
         
     }
     ROS_INFO("time is %f",duration);
@@ -109,7 +109,7 @@ void stuff_trajectory( Vectorq6x1 qvec, trajectory_msgs::JointTrajectory &new_tr
 
     new_trajectory.header.stamp = ros::Time::now();
 
-    double time_to_traverse = getTimeTraversalFromJoints(new_trajectory,g_q_state,qvec);
+    double time_to_traverse = getTimeTraversalFromJoints(qvec);
     double dt = .2; //Lets split things up
     double points = time_to_traverse/dt; //take our calculated time it takes and subdivide into points
 
@@ -123,50 +123,49 @@ void stuff_trajectory( Vectorq6x1 qvec, trajectory_msgs::JointTrajectory &new_tr
         trajectory_point.time_from_start =  ros::Duration(dt);
         new_trajectory.points.push_back(trajectory_point); // append this point to trajectory
     }  
-    
+    /*    trajectory_msgs::JointTrajectoryPoint trajectory_point;
+    for (int ijnt=0;ijnt<6;ijnt++)
+        trajectory_point.positions.push_back(qvec[ijnt]); //for each dt add another point
+    trajectory_point.time_from_start =  ros::Duration(time_to_traverse);
+    new_trajectory.points.push_back(trajectory_point); // append this point to trajectory */
 }
 
 int findOptimalSolution (std::vector<Vectorq6x1> solutions){
     if(sizeof(solutions) < 50) //lets make sure we dont have infinity solutions.... 
     {
-        double maxweight = 0;
+        double minweight = 0;
         double bestindex = 0;
         for(int sol = 0; sol < sizeof(solutions); sol++){
-            double weight = 0;
-            for(int joints = 0; joints < 6; joints++){ //TODO: Fix values according to a table postions 
-                switch(joints){
-                    case 0:
-                        if(solutions[sol][joints] > 0) //if we have the arm pointing in a certain direction we like lets promote it
-                            weight = weight + 5;
-                        break;
-                    case 1:
-                        if(solutions[sol][joints] > 0) //if we have the arm pointing in a certain direction we like lets promote it
-                            weight = weight + 0;
-                        break;
-                    case 2:
-                        if(solutions[sol][joints] > 0) //if we have the arm pointing in a certain direction we like lets promote it
-                            weight = weight + 0;
-                        break;
-                    case 3:
-                        if(solutions[sol][joints] > 0) //if we have the arm pointing in a certain direction we like lets promote it
-                            weight = weight + 0;
-                        break;
-                    case 4:
-                        if(solutions[sol][joints] > 0) //if we have the arm pointing in a certain direction we like lets promote it
-                            weight = weight + 0;
-                        break;
-                    case 5:
-                        if(solutions[sol][joints] > 0) //if we have the arm pointing in a certain direction we like lets promote it
-                            weight = weight + 5;
-                        break;
+                double weight = 0;
+                for(int joints = 0; joints < 6; joints++){ //TODO: Fix values according to a table postions 
+                    weight = 0;
+                    switch(joints){
+                        case 0:
+                            weight = weight + std::abs(g_q_state[joints] - solutions[sol][joints]) * 10;
+                            break;
+                        case 1:
+                            weight =  weight + std::abs(g_q_state[joints] - solutions[sol][joints]) * 8;
+                            break;
+                        case 2:
+                            weight =  weight + std::abs(g_q_state[joints] - solutions[sol][joints]) * 4;
+                            break;
+                        case 3:
+                            weight =  weight + std::abs(g_q_state[joints] - solutions[sol][joints]) * 2;
+                            break;
+                        case 4:
+                            weight =  weight + std::abs(g_q_state[joints] - solutions[sol][joints]) * 1;
+                            break;
+                        case 5:
+                            weight =  weight + std::abs(g_q_state[joints] - solutions[sol][joints]) * 1;
+                            break;
+                    }
+                }
+
+                if(weight < minweight){
+                    minweight = weight;
+                    bestindex = sol;
                 }
             }
-
-            if(weight > maxweight){
-                maxweight = weight;
-                bestindex = sol;
-            }
-        }
         return bestindex;
     }
     else return 0;
