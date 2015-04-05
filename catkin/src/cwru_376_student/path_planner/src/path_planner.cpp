@@ -296,7 +296,7 @@ geometry_msgs::PoseStamped DesStateGenerator::map_to_odom_pose(geometry_msgs::Po
      ROS_INFO("new subgoal: goal in odom pose is (x,y) = (%f, %f)",odom_pose.pose.position.x,odom_pose.pose.position.y);
      ROS_INFO("odom_pose frame id: ");
 
-         if (true) {
+        if (DEBUG_MODE) {
             std::cout<<"DEBUG:  enter 1: ";
             std::cin>>ans;   
         }    
@@ -611,6 +611,7 @@ void DesStateGenerator::unpack_next_path_segment() {
         ROS_INFO("no more segments in the path-segment queue");
         process_new_vertex(); //build and enqueue more path segments, if possible
 
+
     }
     if (waiting_for_vertex_) {       
         //we need more path segments.  Do we have another path vertex available?
@@ -721,8 +722,15 @@ void DesStateGenerator::update_des_state() {
         default:  
             des_state_ = update_des_state_halt();   
         }
-        des_state_publisher_.publish(des_state_); //send out our message
-        current_state_publisher_.publish(current_odom_);
+        if(waiting_for_vertex_) {
+            des_state_publisher_.publish(current_odom_); //send out our message
+            current_state_publisher_.publish(current_odom_);
+        }
+        else {
+            des_state_publisher_.publish(des_state_); //send out our message
+            current_state_publisher_.publish(current_odom_);
+        }
+        
         updating = false;
     }
 }
