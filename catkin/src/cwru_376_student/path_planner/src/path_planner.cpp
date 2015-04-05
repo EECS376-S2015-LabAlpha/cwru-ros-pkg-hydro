@@ -27,7 +27,7 @@ DesStateGenerator::DesStateGenerator(ros::NodeHandle* nodehandle) : nh_(*nodehan
     ROS_INFO("in class constructor of DesStateGenerator");
     mustChangePath = false;
     lidarCollisionCounter = 0;
-    /*tfListener_ = new tf::TransformListener;  //create a transform listener
+    tfListener_ = new tf::TransformListener;  //create a transform listener
     
     // wait to start receiving valid tf transforms between map and odom:
     bool tferr=true;
@@ -46,7 +46,6 @@ DesStateGenerator::DesStateGenerator(ros::NodeHandle* nodehandle) : nh_(*nodehan
                 ros::spinOnce();                
             }   
     }
-    ROS_INFO("tf is good");*/
     // from now on, tfListener will keep track of transforms 
     
     initializeSubscribers(); // package up the messy work of creating subscribers; do this overhead in constructor
@@ -338,8 +337,8 @@ void DesStateGenerator::process_new_vertex() {
     // we want to build path segments to take us from the current pose to the new goal pose
     // the goal pose is transformed to odom coordinates at the last moment, to minimize odom drift issues
     geometry_msgs::Pose map_pose = map_pose_stamped.pose; //strip off the header to simplify notation
-    //geometry_msgs::PoseStamped goal_pose_wrt_odom = map_to_odom_pose(map_pose_stamped); // convert new subgoal pose from map to odom coords
-    geometry_msgs::PoseStamped goal_pose_wrt_odom = map_pose_stamped;
+    geometry_msgs::PoseStamped goal_pose_wrt_odom = map_to_odom_pose(map_pose_stamped); // convert new subgoal pose from map to odom coords
+    //geometry_msgs::PoseStamped goal_pose_wrt_odom = map_pose_stamped;
     geometry_msgs::Pose start_pose_wrt_odom;  // this should be the starting point for our next journey segment
 
     last_map_pose_rcvd_ = map_pose_stamped; // save a copy of this subgoal in memory, in case we need it later
