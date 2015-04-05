@@ -270,6 +270,7 @@ double DesStateGenerator::compute_heading_from_v1_v2(Eigen::Vector2d v1, Eigen::
 geometry_msgs::PoseStamped DesStateGenerator::map_to_odom_pose(geometry_msgs::PoseStamped map_pose) {
     // to use tf, need to convert coords from a geometry_msgs::Pose into a tf::Point
     tf::Point tf_map_goal;
+    map_pose.header.stamp = ros::Time::now();
     tf_map_goal.setX(map_pose.pose.position.x);   //fill in the data members of this tf::Point
     tf_map_goal.setY(map_pose.pose.position.y);
     tf_map_goal.setZ(map_pose.pose.position.z);
@@ -288,7 +289,9 @@ geometry_msgs::PoseStamped DesStateGenerator::map_to_odom_pose(geometry_msgs::Po
     ROS_INFO("new subgoal: goal in odom pose is (x,y) = (%f, %f)",tf_odom_goal.x(),tf_odom_goal.y());  
 
     //let's transform the map_pose goal point into the odom frame:
-    tfListener_->transformPose("odom", map_pose, odom_pose); 
+    tfListener_->transformPose("odom", map_pose, odom_pose);
+    //tfListener_->lookupTransform("odom", "map", ros::Time(0), mapToOdom_);
+    //tf_odom_goal = mapToOdom_*tf_map_goal; //here's one way to transform: operator "*" defined for class tf::Transform 
     //tf::TransformListener tfl;
     //tfl.transformPoint("odom",c_map_pose,odom_pose);
     //tfl.transformPose()
@@ -705,10 +708,8 @@ void DesStateGenerator::unpack_next_path_segment() {
 void DesStateGenerator::update_des_state() {
     if(!updating && !E_stopped)
     {
-        ROS_WARN("test1");
         updating = true;
         current_time = current_time + dt_; //updated the time elapsed
-        ROS_WARN("test2");
         switch (current_seg_type_) {
         case LINE: 
             des_state_ = update_des_state_lineseg();          
@@ -755,7 +756,7 @@ nav_msgs::Odometry DesStateGenerator::update_des_state_lineseg() {
     double delta_s = current_speed_des_*dt_; //incremental forward move distance; a scalar
     
     current_seg_length_to_go_ -= delta_s; // plan to move forward by this much
-    ROS_INFO("update_des_state_lineseg: current_segment_length_to_go_ = %f",current_seg_length_to_go_);     
+    //ROS_INFO("update_des_state_lineseg: current_segment_length_to_go_ = %f",current_seg_length_to_go_);     
     if (current_seg_length_to_go_ < LENGTH_TOL) { // check if done with this move
         // done with line segment;
         current_seg_type_ = HALT;
@@ -763,7 +764,7 @@ nav_msgs::Odometry DesStateGenerator::update_des_state_lineseg() {
         current_seg_length_to_go_=0.0;
         current_speed_des_ = 0.0;  // 
         current_path_seg_done_ = true; 
-        ROS_INFO("update_des_state_lineseg: done with translational motion commands");
+        //ROS_INFO("update_des_state_lineseg: done with translational motion commands");
     }
     else { // not done with translational move yet--step forward
         // based on distance covered, compute current desired x,y; use scaled vector from v1 to v2 
