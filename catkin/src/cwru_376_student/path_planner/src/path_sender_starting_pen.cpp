@@ -63,52 +63,38 @@ int main(int argc, char **argv) {
     
     // fill in the interesting data: (x,y) and phi = location and heading
     //vertex 1:
-    x=5;
-    y=5;
+    x=0.0;
+    y=0.0;
     phi=0;
     ROS_INFO("vertex: x,y,phi = %f, %f %f",x,y,phi);
     vertex.pose = xyPhi2Pose(x,y,phi); //x,y,phi
     path_message.request.path.poses.push_back(vertex);
 
     //vertex 2:
-    x=5.0;
+    x=4.8;
     y=0.0;
-    phi=0.0;
+    phi=-1.57;
     ROS_INFO("vertex: x,y,phi = %f, %f %f",x,y,phi);
     vertex.pose = xyPhi2Pose(x,y,phi); //x,y,phi  
     path_message.request.path.poses.push_back(vertex);
     
     //vertex 3:
-    x=5.0;
-    y=5.0;
-    phi=1.57;
+    x=4.8;
+    y=12.25;
+    phi=-3.14;
     ROS_INFO("vertex: x,y,phi = %f, %f %f",x,y,phi);
     vertex.pose = xyPhi2Pose(x,y,phi); //x,y,phi  
     path_message.request.path.poses.push_back(vertex);
 
         //vertex 4:
-    x=-3.0;
-    y=5.0;
-    phi=3.14;
+    x=-5.2;
+    y=12.25;
+    phi=-3.14;
     ROS_INFO("vertex: x,y,phi = %f, %f %f",x,y,phi);
     vertex.pose = xyPhi2Pose(x,y,phi); //x,y,phi  
     path_message.request.path.poses.push_back(vertex);
     
-         //vertex 5:
-    x=-3.0;
-    y=0.0;
-    phi= -1.57;
-    ROS_INFO("vertex: x,y,phi = %f, %f %f",x,y,phi);
-    vertex.pose = xyPhi2Pose(x,y,phi); //x,y,phi  
-    path_message.request.path.poses.push_back(vertex);
-    
-         //vertex 6:
-    x=0.0;
-    y=0.0;
-    phi= 0;
-    ROS_INFO("vertex: x,y,phi = %f, %f %f",x,y,phi);
-    vertex.pose = xyPhi2Pose(x,y,phi); //x,y,phi  
-    path_message.request.path.poses.push_back(vertex);
+
     
     //transmit this path message:
     if (client.call(path_message)) {
