@@ -723,14 +723,14 @@ void DesStateGenerator::update_des_state() {
         default:  
             des_state_ = update_des_state_halt();   
         }
-        if(waiting_for_vertex_) {
+        /*if(waiting_for_vertex_) {
             des_state_publisher_.publish(current_odom_); //send out our message
             current_state_publisher_.publish(current_odom_);
-        }
-        else {
+        }*/
+        //else {
             des_state_publisher_.publish(des_state_); //send out our message
             current_state_publisher_.publish(current_odom_);
-        }
+        //}
         
         updating = false;
     }
