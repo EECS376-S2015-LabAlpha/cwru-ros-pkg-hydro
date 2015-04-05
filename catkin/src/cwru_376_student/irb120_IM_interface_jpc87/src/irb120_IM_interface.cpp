@@ -117,10 +117,10 @@ void stuff_trajectory( Vectorq6x1 qvec, trajectory_msgs::JointTrajectory &new_tr
         trajectory_msgs::JointTrajectoryPoint trajectory_point;
         trajectory_point.positions.clear(); 
         for (int ijnt=0;ijnt<6;ijnt++) {
-            trajectory_point.positions.push_back(g_q_state[ijnt] + ((g_q_state[ijnt] - qvec[ijnt]) * point/points)); //for each dt add another point
+            trajectory_point.positions.push_back(g_q_state[ijnt] + ( qvec[ijnt] - g_q_state[ijnt]) * (point / points)); //for each dt add another point
         }  
 
-        trajectory_point.time_from_start =  ros::Duration(dt);
+        trajectory_point.time_from_start =  ros::Duration(dt * point);
         new_trajectory.points.push_back(trajectory_point); // append this point to trajectory
     }  
     /*    trajectory_msgs::JointTrajectoryPoint trajectory_point;
@@ -144,7 +144,7 @@ int findOptimalSolution (std::vector<Vectorq6x1> solutions){
                             weight = weight + std::abs(g_q_state[joints] - solutions[sol][joints]) * 10;
                             break;
                         case 1:
-                            weight =  weight + std::abs(g_q_state[joints] - solutions[sol][joints]) * 8;
+                            weight =  weight + std::abs(g_q_state[joints] - solutions[sol][joints]) * 7;
                             break;
                         case 2:
                             weight =  weight + std::abs(g_q_state[joints] - solutions[sol][joints]) * 4;
@@ -168,7 +168,43 @@ int findOptimalSolution (std::vector<Vectorq6x1> solutions){
             }
         return bestindex;
     }
-    else return 0;
+    else {
+        ROS_INFO("Too many solutions... choosing from the first 50");
+        double minweight = 0;
+        double bestindex = 0;
+        for(int sol = 0; sol < 50; sol++){
+                double weight = 0;
+                for(int joints = 0; joints < 6; joints++){ //TODO: Fix values according to a table postions 
+                    weight = 0;
+                    switch(joints){
+                        case 0:
+                            weight = weight + std::abs(g_q_state[joints] - solutions[sol][joints]) * 10;
+                            break;
+                        case 1:
+                            weight =  weight + std::abs(g_q_state[joints] - solutions[sol][joints]) * 7;
+                            break;
+                        case 2:
+                            weight =  weight + std::abs(g_q_state[joints] - solutions[sol][joints]) * 4;
+                            break;
+                        case 3:
+                            weight =  weight + std::abs(g_q_state[joints] - solutions[sol][joints]) * 2;
+                            break;
+                        case 4:
+                            weight =  weight + std::abs(g_q_state[joints] - solutions[sol][joints]) * 1;
+                            break;
+                        case 5:
+                            weight =  weight + std::abs(g_q_state[joints] - solutions[sol][joints]) * 1;
+                            break;
+                    }
+                }
+
+                if(weight < minweight){
+                    minweight = weight;
+                    bestindex = sol;
+                }
+            }
+        return bestindex;
+    }
 }
 
 
