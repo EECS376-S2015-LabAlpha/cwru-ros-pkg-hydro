@@ -48,6 +48,20 @@ geometry_msgs::Pose xyPhi2Pose(double x, double y, double phi) {
     return pose;
 }
 
+double convertPlanarQuat2Phi(geometry_msgs::Quaternion quaternion) {
+    double quat_z = quaternion.z;
+    double quat_w = quaternion.w;
+    double phi = 2.0 * atan2(quat_z, quat_w); // cheap conversion from quaternion to heading for planar motion
+    //Make sure that the returned angle is within +- 2 * pi
+    /*while (phi < -6.2831853) {
+        phi += 6.2831853;
+    }
+    while (phi > 6.2831853) {
+        phi -= 6.2831853;
+    }*/
+    return phi;
+}
+
 int main(int argc, char **argv) {
     double dt=0.01;
     ros::init(argc, argv, "test_path_sender"); // name of this node 
@@ -63,33 +77,53 @@ int main(int argc, char **argv) {
     
     // fill in the interesting data: (x,y) and phi = location and heading
     //vertex 1:
-    x=0.0;
-    y=0.0;
-    phi=0;
+    geometry_msgs::Quaternion quaternion1;
+    quaternion1.x = 0.0;
+    quaternion1.y = 0.0;
+    quaternion1.z = -0.9092;
+    quaternion1.w = 0.4162;
+    x=8.682;
+    y=15.881;
+    phi=convertPlanarQuat2Phi(quaternion1);
     ROS_INFO("vertex: x,y,phi = %f, %f %f",x,y,phi);
     vertex.pose = xyPhi2Pose(x,y,phi); //x,y,phi
     path_message.request.path.poses.push_back(vertex);
 
     //vertex 2:
-    x=4.8;
-    y=0.0;
-    phi=-1.57;
+    geometry_msgs::Quaternion quaternion2;
+    quaternion2.x = 0.0;
+    quaternion2.y = 0.0;
+    quaternion2.z = 0.9305;
+    quaternion2.w = 0.3663;
+    x=5.099;
+    y=12.208;
+    phi=convertPlanarQuat2Phi(quaternion2);
     ROS_INFO("vertex: x,y,phi = %f, %f %f",x,y,phi);
     vertex.pose = xyPhi2Pose(x,y,phi); //x,y,phi  
     path_message.request.path.poses.push_back(vertex);
     
     //vertex 3:
-    x=4.8;
-    y=12.25;
-    phi=-3.14;
+    geometry_msgs::Quaternion quaternion3;
+    quaternion3.x = 0.0;
+    quaternion3.y = 0.0;
+    quaternion3.z = 0.3725;
+    quaternion3.w = 0.9280;
+    x=-3.211;
+    y=20.7907;
+    phi=convertPlanarQuat2Phi(quaternion3);
     ROS_INFO("vertex: x,y,phi = %f, %f %f",x,y,phi);
     vertex.pose = xyPhi2Pose(x,y,phi); //x,y,phi  
     path_message.request.path.poses.push_back(vertex);
 
         //vertex 4:
-    x=-5.2;
-    y=12.25;
-    phi=-3.14;
+    geometry_msgs::Quaternion quaternion4;
+    quaternion4.x = 0.0;
+    quaternion4.y = 0.0;
+    quaternion4.z = -0.369;
+    quaternion4.w = 0.9302;
+    x=3.4058;
+    y=26.9174;
+    phi=convertPlanarQuat2Phi(quaternion4);
     ROS_INFO("vertex: x,y,phi = %f, %f %f",x,y,phi);
     vertex.pose = xyPhi2Pose(x,y,phi); //x,y,phi  
     path_message.request.path.poses.push_back(vertex);
