@@ -70,7 +70,7 @@ bool triggerService(cwru_srv::simple_bool_service_messageRequest& request, cwru_
     return true;
 }
 
-double getTimeTraversalFromJoints(Vectorq6x1 end){
+double getTimeTraversalFromJoints(Vectorq6x1 initial_state, Vectorq6x1 end){
     double weight = 0;
     double duration = 0;
     for(int joints = 0; joints < 6; joints++){
@@ -88,7 +88,7 @@ double getTimeTraversalFromJoints(Vectorq6x1 end){
                 weight = .2; //we dont really care for the small guys in terms of subdivisions
         }
         
-        duration +=  weight * std::abs(g_q_state[joints] - end[joints]);
+        duration +=  weight * std::abs(initial_state[joints] - end[joints]);
         
     }
     ROS_INFO("time is %f",duration);
@@ -96,7 +96,7 @@ double getTimeTraversalFromJoints(Vectorq6x1 end){
 }
 
 //command robot to move to "qvec" using a trajectory message, sent via ROS-I
-void stuff_trajectory( Vectorq6x1 qvec, trajectory_msgs::JointTrajectory &new_trajectory) {
+void stuff_trajectory( std::vector<Vectorq6x1> qvec_array, int number_of_vecs, trajectory_msgs::JointTrajectory &new_trajectory, double wait_time) {
 
     new_trajectory.points.clear();
 
@@ -109,20 +109,32 @@ void stuff_trajectory( Vectorq6x1 qvec, trajectory_msgs::JointTrajectory &new_tr
 
     new_trajectory.header.stamp = ros::Time::now();
 
-    double time_to_traverse = getTimeTraversalFromJoints(qvec);
-    double dt = .2; //Lets split things up
-    double points = time_to_traverse/dt; //take our calculated time it takes and subdivide into points
+    Vectorq6x1 qvec;
+    double total_duration = 0;
+    Vectorq6x1 initial_state = g_q_state; 
+    for(int vec = 0;vec < number_of_vecs;vec++){
+        qvec = qvec_array[vec];
+        double time_to_traverse = getTimeTraversalFromJoints(initial_state,qvec);
+        double dt = .2; //Lets split things up
+        double points = time_to_traverse/dt; //take our calculated time it takes and subdivide into points
 
-    for (int point=0;point<points;point++) {
-        trajectory_msgs::JointTrajectoryPoint trajectory_point;
-        trajectory_point.positions.clear(); 
+        for (int point=0;point<points;point++) {
+            trajectory_msgs::JointTrajectoryPoint trajectory_point;
+            trajectory_point.positions.clear(); 
+            for (int ijnt=0;ijnt<6;ijnt++) {
+                trajectory_point.positions.push_back(initial_state[ijnt] + ( qvec[ijnt] - initial_state[ijnt]) * (point / points)); //for each dt add another point
+            }  
+
+            trajectory_point.time_from_start =  ros::Duration(dt * point + total_duration);
+            new_trajectory.points.push_back(trajectory_point); // append this point to trajectory
+        }
+
         for (int ijnt=0;ijnt<6;ijnt++) {
-            trajectory_point.positions.push_back(g_q_state[ijnt] + ( qvec[ijnt] - g_q_state[ijnt]) * (point / points)); //for each dt add another point
-        }  
-
-        trajectory_point.time_from_start =  ros::Duration(dt * point);
-        new_trajectory.points.push_back(trajectory_point); // append this point to trajectory
-    }  
+            initial_state[ijnt] = qvec[ijnt];
+        } 
+        
+        total_duration = total_duration +  time_to_traverse + wait_time;
+    }
     /*    trajectory_msgs::JointTrajectoryPoint trajectory_point;
     for (int ijnt=0;ijnt<6;ijnt++)
         trajectory_point.positions.push_back(qvec[ijnt]); //for each dt add another point
@@ -131,80 +143,48 @@ void stuff_trajectory( Vectorq6x1 qvec, trajectory_msgs::JointTrajectory &new_tr
 }
 
 int findOptimalSolution (std::vector<Vectorq6x1> solutions){
-    if(sizeof(solutions) < 50) //lets make sure we dont have infinity solutions.... 
+    int maxSize;
+    if(sizeof(solutions) > 50) //lets make sure we dont have infinity solutions.... 
     {
-        double minweight = 0;
-        double bestindex = 0;
-        for(int sol = 0; sol < sizeof(solutions); sol++){
-                double weight = 0;
-                for(int joints = 0; joints < 6; joints++){ //TODO: Fix values according to a table postions 
-                    weight = 0;
-                    switch(joints){
-                        case 0:
-                            weight = weight + std::abs(g_q_state[joints] - solutions[sol][joints]) * 10;
-                            break;
-                        case 1:
-                            weight =  weight + std::abs(g_q_state[joints] - solutions[sol][joints]) * 7;
-                            break;
-                        case 2:
-                            weight =  weight + std::abs(g_q_state[joints] - solutions[sol][joints]) * 4;
-                            break;
-                        case 3:
-                            weight =  weight + std::abs(g_q_state[joints] - solutions[sol][joints]) * 2;
-                            break;
-                        case 4:
-                            weight =  weight + std::abs(g_q_state[joints] - solutions[sol][joints]) * 1;
-                            break;
-                        case 5:
-                            weight =  weight + std::abs(g_q_state[joints] - solutions[sol][joints]) * 1;
-                            break;
-                    }
-                }
-
-                if(weight < minweight){
-                    minweight = weight;
-                    bestindex = sol;
-                }
-            }
-        return bestindex;
-    }
-    else {
         ROS_INFO("Too many solutions... choosing from the first 50");
-        double minweight = 0;
-        double bestindex = 0;
-        for(int sol = 0; sol < 50; sol++){
-                double weight = 0;
-                for(int joints = 0; joints < 6; joints++){ //TODO: Fix values according to a table postions 
-                    weight = 0;
-                    switch(joints){
-                        case 0:
-                            weight = weight + std::abs(g_q_state[joints] - solutions[sol][joints]) * 10;
-                            break;
-                        case 1:
-                            weight =  weight + std::abs(g_q_state[joints] - solutions[sol][joints]) * 7;
-                            break;
-                        case 2:
-                            weight =  weight + std::abs(g_q_state[joints] - solutions[sol][joints]) * 4;
-                            break;
-                        case 3:
-                            weight =  weight + std::abs(g_q_state[joints] - solutions[sol][joints]) * 2;
-                            break;
-                        case 4:
-                            weight =  weight + std::abs(g_q_state[joints] - solutions[sol][joints]) * 1;
-                            break;
-                        case 5:
-                            weight =  weight + std::abs(g_q_state[joints] - solutions[sol][joints]) * 1;
-                            break;
-                    }
-                }
+        maxSize = 50;
+    }
+    else maxSize = sizeof(solutions);
 
-                if(weight < minweight){
-                    minweight = weight;
-                    bestindex = sol;
+    double minweight = 0;
+    double bestindex = 0;
+    for(int sol = 0; sol < maxSize; sol++){
+            double weight = 0;
+            for(int joints = 0; joints < 6; joints++){
+                weight = 0;
+                switch(joints){
+                    case 0:
+                        weight = weight + std::abs(g_q_state[joints] - solutions[sol][joints]) * 10 + std::abs(solutions[sol][joints]) * 10;
+                        break;
+                    case 1:
+                        weight =  weight + std::abs(g_q_state[joints] - solutions[sol][joints]) * 7 + (solutions[sol][joints] + M_PI/2) * 10;
+                        break;
+                    case 2:
+                        weight =  weight + std::abs(g_q_state[joints] - solutions[sol][joints]) * 4 - (solutions[sol][joints] - M_PI/2) * 10;
+                        break;
+                    case 3:
+                        weight =  weight + std::abs(g_q_state[joints] - solutions[sol][joints]) * 2;
+                        break;
+                    case 4:
+                        weight =  weight + std::abs(g_q_state[joints] - solutions[sol][joints]) * 1;
+                        break;
+                    case 5:
+                        weight =  weight + std::abs(g_q_state[joints] - solutions[sol][joints]) * 1;
+                        break;
                 }
             }
-        return bestindex;
-    }
+
+            if(weight < minweight){
+                minweight = weight;
+                bestindex = sol;
+            }
+        }
+    return bestindex;
 }
 
 
@@ -220,7 +200,9 @@ int main(int argc, char** argv) {
     Eigen::Vector3d p;
     Eigen::Vector3d n_des,t_des,b_des;
     std::vector<Vectorq6x1> q6dof_solns;
+    std::vector<Vectorq6x1> q6dof_desired_poses(2);
     Vectorq6x1 qvec;
+    Vectorq6x1 homevec;
     ros::Rate sleep_timer(frequency); //10Hz update rate    
     Irb120_fwd_solver irb120_fwd_solver; //instantiate forward and IK solvers
     Irb120_IK_solver ik_solver;
@@ -246,7 +228,7 @@ int main(int argc, char** argv) {
     trajectory_msgs::JointTrajectory new_trajectory; // an empty trajectory
 
     
-    //qvec<<0,0,0,0,0,0;
+    homevec<<0,-M_PI/3,-M_PI/3,0,M_PI/3,0; //home state... deriably with 0, -pi/2 , pi/2 to start.
     Eigen::Affine3d A_flange_des_DH;
     
     //   A_fwd_DH = irb120_fwd_solver.fwd_kin_solve(qvec); //fwd_kin_solve
@@ -272,9 +254,12 @@ int main(int argc, char** argv) {
 
                 if (nsolns>0) {      
                     ik_solver.get_solns(q6dof_solns);
+                    qvec = q6dof_solns[findOptimalSolution(q6dof_solns)]; // arbitrarily choose first soln  
 
-                    qvec = q6dof_solns[findOptimalSolution(q6dof_solns)]; // arbitrarily choose first soln                    
-                    stuff_trajectory(qvec,new_trajectory);
+                    q6dof_desired_poses[0] = qvec;
+                    q6dof_desired_poses[1] = homevec;  
+                                   
+                    stuff_trajectory(q6dof_desired_poses,2,new_trajectory, 2);
  
                         pub.publish(new_trajectory);
                 }
