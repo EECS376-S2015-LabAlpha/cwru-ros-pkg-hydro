@@ -6,6 +6,7 @@
 #include <visualization_msgs/Marker.h>
 #include <geometry_msgs/Point.h>
 #include <iostream>
+#include <sstream>
 #include <math.h>
 #include <stdlib.h>
 #include <string>
@@ -70,6 +71,7 @@ bool triggerService(cwru_srv::simple_bool_service_messageRequest& request, cwru_
     return true;
 }
 
+//Used to get appropriate time based on joint movements
 double getTimeTraversalFromJoints(Vectorq6x1 initial_state, Vectorq6x1 end){
     double weight = 0;
     double duration = 0;
@@ -112,46 +114,42 @@ void stuff_trajectory( std::vector<Vectorq6x1> qvec_array, int number_of_vecs, t
     Vectorq6x1 qvec;
     double total_duration = 0;
     Vectorq6x1 initial_state = g_q_state; 
-    for(int vec = 0;vec < number_of_vecs;vec++){
-        qvec = qvec_array[vec];
-        double time_to_traverse = getTimeTraversalFromJoints(initial_state,qvec);
+    for(int vec = 0;vec < number_of_vecs;vec++){ //Lets traverse over the vectors that came in
+        qvec = qvec_array[vec];//Get the nth element
+        double time_to_traverse = getTimeTraversalFromJoints(initial_state,qvec); //Get how much time this should take
         double dt = .2; //Lets split things up
         double points = time_to_traverse/dt; //take our calculated time it takes and subdivide into points
 
-        for (int point=0;point<points;point++) {
+        for (int point=0;point<points;point++) { //Lets go thorugh all the points
             trajectory_msgs::JointTrajectoryPoint trajectory_point;
             trajectory_point.positions.clear(); 
-            for (int ijnt=0;ijnt<6;ijnt++) {
+            for (int ijnt=0;ijnt<6;ijnt++) { //In each point we have to update the individual joints
                 trajectory_point.positions.push_back(initial_state[ijnt] + ( qvec[ijnt] - initial_state[ijnt]) * (point / points)); //for each dt add another point
             }  
 
-            trajectory_point.time_from_start =  ros::Duration(dt * point + total_duration);
+            trajectory_point.time_from_start =  ros::Duration(dt * point + total_duration); //The time where each segment ends is the total so far plus the dt
             new_trajectory.points.push_back(trajectory_point); // append this point to trajectory
         }
 
         for (int ijnt=0;ijnt<6;ijnt++) {
-            initial_state[ijnt] = qvec[ijnt];
+            initial_state[ijnt] = qvec[ijnt];//Update the new current position after move is made
         } 
         
-        total_duration = total_duration +  time_to_traverse + wait_time;
+        total_duration = total_duration +  time_to_traverse + wait_time;//Update time for the next vector
     }
-    /*    trajectory_msgs::JointTrajectoryPoint trajectory_point;
-    for (int ijnt=0;ijnt<6;ijnt++)
-        trajectory_point.positions.push_back(qvec[ijnt]); //for each dt add another point
-    trajectory_point.time_from_start =  ros::Duration(time_to_traverse);
-    new_trajectory.points.push_back(trajectory_point); // append this point to trajectory */
 }
 
-int findOptimalSolution (std::vector<Vectorq6x1> solutions){
-    int maxSize;
-    if(sizeof(solutions) > 50) //lets make sure we dont have infinity solutions.... 
+//Used to determine the best solution among many solutions
+int findOptimalSolution (std::vector<Vectorq6x1> solutions, double count){
+    int maxSize; //use this to determine the solutions to iterate through
+    if(count > 50) //lets make sure we dont have infinity solutions.... 
     {
         ROS_INFO("Too many solutions... choosing from the first 50");
         maxSize = 50;
     }
-    else maxSize = sizeof(solutions);
+    else maxSize = count; //lets use what came in
 
-    double minweight = 0;
+    double minweight = 0; //Use this and bestIndex to keep track of the best option
     double bestindex = 0;
     for(int sol = 0; sol < maxSize; sol++){
             double weight = 0;
@@ -159,16 +157,16 @@ int findOptimalSolution (std::vector<Vectorq6x1> solutions){
                 weight = 0;
                 switch(joints){
                     case 0:
-                        weight = weight + std::abs(g_q_state[joints] - solutions[sol][joints]) * 10 + std::abs(solutions[sol][joints]) * 10;
+                        weight = weight + std::abs(g_q_state[joints] - solutions[sol][joints]) * 10 + std::abs(solutions[sol][joints]) * 20; //Make it really pleasing to be in the up position
                         break;
                     case 1:
-                        weight =  weight + std::abs(g_q_state[joints] - solutions[sol][joints]) * 7 + (solutions[sol][joints] + M_PI/2) * 10;
+                        weight =  weight + std::abs(g_q_state[joints] - solutions[sol][joints]) * 7 + (solutions[sol][joints] + M_PI/2) * 10; //And upright for the second...
                         break;
                     case 2:
-                        weight =  weight + std::abs(g_q_state[joints] - solutions[sol][joints]) * 4 - (solutions[sol][joints] - M_PI/2) * 10;
+                        weight =  weight + std::abs(g_q_state[joints] - solutions[sol][joints]) * 4 - (solutions[sol][joints] - M_PI/2) * 10; //And third joints.
                         break;
                     case 3:
-                        weight =  weight + std::abs(g_q_state[joints] - solutions[sol][joints]) * 2;
+                        weight =  weight + std::abs(g_q_state[joints] - solutions[sol][joints]) * 2; //The rest isn't that crucial
                         break;
                     case 4:
                         weight =  weight + std::abs(g_q_state[joints] - solutions[sol][joints]) * 1;
@@ -178,8 +176,8 @@ int findOptimalSolution (std::vector<Vectorq6x1> solutions){
                         break;
                 }
             }
-
-            if(weight < minweight){
+            //ROS_INFO("With weight %f and 1st joint at %f", weight, solutions[sol][0]); //Lets print out the important stuff
+            if(weight < minweight){//Lets update the best choice
                 minweight = weight;
                 bestindex = sol;
             }
@@ -200,7 +198,7 @@ int main(int argc, char** argv) {
     Eigen::Vector3d p;
     Eigen::Vector3d n_des,t_des,b_des;
     std::vector<Vectorq6x1> q6dof_solns;
-    std::vector<Vectorq6x1> q6dof_desired_poses(2);
+    std::vector<Vectorq6x1> q6dof_desired_poses(2); //Array of poses to feed in
     Vectorq6x1 qvec;
     Vectorq6x1 homevec;
     ros::Rate sleep_timer(frequency); //10Hz update rate    
@@ -228,19 +226,15 @@ int main(int argc, char** argv) {
     trajectory_msgs::JointTrajectory new_trajectory; // an empty trajectory
 
     
-    homevec<<0,-M_PI/3,-M_PI/3,0,M_PI/3,0; //home state... deriably with 0, -pi/2 , pi/2 to start.
+    homevec<<0,-M_PI/3,-M_PI/3,0,M_PI/3,0; //home state... deriably with 0, -pi/2 , pi/2 to start. This is used so that it can always get to the table from above
     Eigen::Affine3d A_flange_des_DH;
     
-    //   A_fwd_DH = irb120_fwd_solver.fwd_kin_solve(qvec); //fwd_kin_solve
-
-    //std::cout << "A rot: " << std::endl;
-    //std::cout << A_fwd_DH.linear() << std::endl;
-    //std::cout << "A origin: " << A_fwd_DH.translation().transpose() << std::endl;   
-  
+    //Eigen::Affine3d A_fwd_DH = irb120_fwd_solver.fwd_kin_solve(qvec); //fwd_kin_solve
     
     int nsolns;
     while(ros::ok()) {
             ros::spinOnce();
+
             if (g_trigger) {
                 // ooh!  excitement time!  got a new tool pose goal!
                 g_trigger=false; // reset the trigger
@@ -254,12 +248,12 @@ int main(int argc, char** argv) {
 
                 if (nsolns>0) {      
                     ik_solver.get_solns(q6dof_solns);
-                    qvec = q6dof_solns[findOptimalSolution(q6dof_solns)]; // arbitrarily choose first soln  
+                    qvec = q6dof_solns[findOptimalSolution(q6dof_solns, nsolns)]; // Choose the first solution wisely
 
-                    q6dof_desired_poses[0] = qvec;
-                    q6dof_desired_poses[1] = homevec;  
+                    q6dof_desired_poses[0] = qvec; //first go to my first point
+                    q6dof_desired_poses[1] = homevec;  //then my own defined home
                                    
-                    stuff_trajectory(q6dof_desired_poses,2,new_trajectory, 2);
+                    stuff_trajectory(q6dof_desired_poses,2,new_trajectory, 2); //2 poses feed in with a 2 sec delay in between each one
  
                         pub.publish(new_trajectory);
                 }
