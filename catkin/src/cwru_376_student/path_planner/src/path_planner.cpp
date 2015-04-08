@@ -296,14 +296,14 @@ geometry_msgs::PoseStamped DesStateGenerator::map_to_odom_pose(geometry_msgs::Po
     //tfl.transformPoint("odom",c_map_pose,odom_pose);
     //tfl.transformPose()
     
-     ROS_INFO("new subgoal: goal in odom pose is (x,y) = (%f, %f)",odom_pose.pose.position.x,odom_pose.pose.position.y);
+     ROS_INFO("--- new subgoal: in odom pose (x,y,phi) = (%f, %f, %f)",odom_pose.pose.position.x,odom_pose.pose.position.y, convertPlanarQuat2Phi(odom_pose.pose.orientation));
      ROS_INFO("odom_pose frame id: ");
 
         if (DEBUG_MODE) {
             std::cout<<"DEBUG:  enter 1: ";
             std::cin>>ans;   
         }    
-    return odom_pose; // dummy--no conversion; when AMCL is running, use base-frame transform to convert from map to odom coords
+    return odom_pose; // dummy--no conversion; when AMCL is running, use base-frame transform convert from map to odom coords
 }
 
 //DUMMY...
@@ -320,6 +320,7 @@ geometry_msgs::PoseStamped DesStateGenerator::odom_to_map_pose(geometry_msgs::Po
 // should extend this to include blended circular arc path segments
 void DesStateGenerator::process_new_vertex() {
     if (path_queue_.empty()) { // do nothing
+		ROS_INFO("empty segment");
         waiting_for_vertex_ = true;
         //current_seg_type_ = HALT;
         return;
@@ -617,7 +618,7 @@ void DesStateGenerator::unpack_next_path_segment() {
 
     }
     if (waiting_for_vertex_) {       
-        //we need more path segments.  Do we have another path vertex available?
+        //we need more path segments.  Do we have fanother path vertex available?
         ROS_INFO("no more vertices in the path queue either...");
         current_seg_type_=HALT; // nothing more we can do until get more subgoals
 
@@ -650,7 +651,15 @@ void DesStateGenerator::unpack_next_path_segment() {
     // given a path segment; populate member vars for current segment
     // the following are segment parameter values, unchanging while traversing the segment:
     current_seg_type_ = path_segment.seg_type;
-    current_seg_curvature_ = path_segment.curvature;
+    /*
+    int8 LINE=1
+	int8 ARC=2
+	int8 SPIN_IN_PLACE=3
+    */
+    if(current_seg_type_ == 1) ROS_INFO("--- 1  currently in a line segment");
+    if(current_seg_type_ == 2) ROS_INFO("--- 22 currently in a arc segment");
+    if(current_seg_type_ == 3) { ROS_INFO("--- 333 currently in a spin segment"); }
+;    current_seg_curvature_ = path_segment.curvature;
     current_seg_length_ = path_segment.seg_length;
     current_seg_ref_point_(0) = path_segment.ref_point.x;
     current_seg_ref_point_(1) = path_segment.ref_point.y;  
@@ -723,14 +732,15 @@ void DesStateGenerator::update_des_state() {
         default:  
             des_state_ = update_des_state_halt();   
         }
-        /*if(waiting_for_vertex_) {
+        if(waiting_for_vertex_) {
+			ROS_WARN("Waiting for vertext, publishing current odom!!");
             des_state_publisher_.publish(current_odom_); //send out our message
             current_state_publisher_.publish(current_odom_);
-        }*/
-        //else {
+        }
+        else {
             des_state_publisher_.publish(des_state_); //send out our message
             current_state_publisher_.publish(current_odom_);
-        //}
+        }
         
         updating = false;
     }
