@@ -1,4 +1,4 @@
-# path_sender
+# Path Planner
 
 This node is a combination of Jiawei's path planning node and Jean's desired state generator node. 
 It takes in a bunch of Poses from the path sender, creates a bunch of PathSegments out of those poses
