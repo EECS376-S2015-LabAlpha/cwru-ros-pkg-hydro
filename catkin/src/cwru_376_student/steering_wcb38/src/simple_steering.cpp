@@ -174,49 +174,12 @@ void SteeringController::my_clever_steering_algorithm() {
         |--\
 
     */
-    double desired_heading = atan(2*lateral_err); // relative to the actual heading
-    // heading_err is current relative to the actual heading
-    double steering_correction = min_dang(desired_heading-heading_err);
-    //     trip_dist_correction = trip_dist_error;
-
-    // theta covered = (omega_odom+omega_cmd)/2*(1/UPDATE_RATE) = (w_odom+w_cmd) / (2 * UPDATE_RATE)
-    // omega_odom + omega_cmd = (theta_desired) * (2 * UPDATE_RATE)
-    // omega_cmd = (theta_desired*2*UPDATE_RATE) - omega_odom
-
     double speed_correction = (0.5)*atan(1.0*trip_dist_err);
     
-    
-
-    // now we have corrections
-    controller_speed = std::max(std::min(1.1*MAX_SPEED, des_state_vel_+speed_correction), 0.0);
-
-    if(steering_correction > .5) {
-        controller_speed = std::max(0.0, odom_vel_ - MAX_ALPHA);
-    }
-
-    controller_omega = steering_correction*2.0*UPDATE_RATE - odom_omega_;
-
-    // apply speed and acceleration limits
-    if(controller_omega > MAX_OMEGA) { controller_omega = MAX_OMEGA; }
-    if(controller_omega < -1.0*MAX_OMEGA) { controller_omega = -1.0*MAX_OMEGA; }
-    if(odom_omega_ + MAX_ALPHA < controller_omega) { controller_omega = odom_omega_ + MAX_ALPHA; }
-    if(odom_omega_ - MAX_ALPHA > controller_omega) { controller_omega = odom_omega_ - MAX_ALPHA; }
-
-    // send out our very clever speed/spin commands:
-    twist_cmd_.linear.x = controller_speed;
-    twist_cmd_.angular.z = controller_omega;
-
-
-    /* Clever commands round 2 */
-
-    if(lateral_err > 1.0 || true) {
-        heading_err = min_dang(des_state_phi_+atan(2*lateral_err) - odom_phi_);
-    }
-    else if(lateral_err < -1.0) {
-        heading_err = min_dang(des_state_phi_-1.5708 - odom_phi_);
-    }
-
+    heading_err = min_dang(des_state_phi_+atan(2*lateral_err) - odom_phi_);
     twist_cmd_.angular.z = heading_err*(1.0);
+
+    // if the heading error is close enough, just use 0 angular velocity
 
     if(heading_err*1.0 < .005 && heading_err*1.0 > -.005) {
         twist_cmd_.angular.z = 0.0;

@@ -5,34 +5,45 @@ If you'd like to work from this steering algorithm, please make your own branch 
 A steering algorithm that converts lateral, heading and trip-dist errors into 
  a Twist.
 
-### LINEAR 
-speed correction = -k*atan(j*trip_dist_err)
+
+### Speed Correction
+
+speed correction = k*atan(j*trip_dist_err)
  k is the maximum correction factor
  j is the sensitivity correction (larger for faster changes)
  
  This gives a stable adjustment to speed based on how ahead or behind the robot
   is on its path. There is a known maximum (range of atan).
- This is directly added to the requested/desired velocity. Note, this may be
-  forced to 0 if the modified heading error is too large.
+
+### Linear Velocity
+
+Linear velocity is determined by adding the speed correction directly to the desired state velocity. If the robot is behind, the robot will accelerate ahead to catch up, and vice versa.
+
+twist_cmd_.linear.x = des_state_vel_+speed_correction;
+
+
+### Heading Error
+
+The heading error was revised to account for lateral error. The equation for this is as follows:
+
+heading_err = min_dang(des_state_phi+atan(2*lateral_err) - odom_phi)
+
+ - min_dang = minimizes the angle, so that it will, for example, turn left from heading of 1 degree to heading of 359 degrees instead of turning 358 degrees to the right.
+ - des_state_phi = published desired state heading
+ - odom_phi = published current heading in odom
+ - atan(2*laterall_err) = this is a correction that maps any lateral error to an adjustment of up to 90 degrees (directly facing/perpendicular to desired state x,y path). the *2 factor scales the adjustment so that it will be approximately 90 degrees at 1 meter of lateral error.
 
 ### Angular
-desired_heading = -k*atan(j*lateral_err)
- k is the correction magnitude (usually 1)
- j is the sensitivity correction (larger for faster changes)
- 
- This gives a stable adjustment to the desired heading to correct for lateral
-  error. The maximum angle is going to be 90 deg (1.57 radians) perpendicular to
-  the path for large lateral error.
- The steering correction/modified heading error is the difference between this 
-  and the heading error. This is converted to command_omega by the following:
- 
-controller_omega = steering_correction*2.0*UPDATE_RATE - odom_omega
+
+Angular velocity is determined with proportional control based directly on the heading error calculation.
+
+twist_cmd_.angular.z = heading_err*1
 
  
 
 ## Example usage
 
- WIP
+  rosrun steering_wcb38 simple_steering
 
 ## Running tests/demos
     
