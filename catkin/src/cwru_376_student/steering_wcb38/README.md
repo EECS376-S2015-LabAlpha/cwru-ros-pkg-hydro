@@ -1,9 +1,7 @@
-If you'd like to work from this steering algorithm, please make your own branch or package.
-
 # steering_wcb38
 
 A steering algorithm that converts lateral, heading and trip-dist errors into 
- a Twist.
+  a Twist. See below for the calculations that it makes, and the way that those calculations are converted into a Linear and Angular velocity command (Twist).
 
 
 ### Speed Correction
@@ -44,6 +42,6 @@ twist_cmd_.angular.z = heading_err*1
 ## Example usage
 
   rosrun steering_wcb38 simple_steering
+  **Note: requires a node such as path_planner path_planner to be running that publishes the current state and the desired state.
 
 ## Running tests/demos
-    
