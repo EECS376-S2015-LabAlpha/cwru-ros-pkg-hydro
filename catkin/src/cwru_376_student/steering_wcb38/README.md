@@ -7,8 +7,8 @@ A steering algorithm that converts lateral, heading and trip-dist errors into
 ### Speed Correction
 
 speed correction = k*atan(j*trip_dist_err)
- k is the maximum correction factor
- j is the sensitivity correction (larger for faster changes)
+ - k is the maximum correction factor
+ - j is the sensitivity correction (larger for faster changes)
  
  This gives a stable adjustment to speed based on how ahead or behind the robot
   is on its path. There is a known maximum (range of atan).
