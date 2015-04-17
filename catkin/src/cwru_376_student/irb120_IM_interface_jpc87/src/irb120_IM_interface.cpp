@@ -163,7 +163,7 @@ int findOptimalSolution (std::vector<Vectorq6x1> solutions, double count){
                         weight =  weight + std::abs(g_q_state[joints] - solutions[sol][joints]) * 7 + (solutions[sol][joints] + M_PI/2) * 10; //And upright for the second...
                         break;
                     case 2:
-                        weight =  weight + std::abs(g_q_state[joints] - solutions[sol][joints]) * 4 - (solutions[sol][joints] - M_PI/2) * 10; //And third joints.
+                        weight =  weight + std::abs(g_q_state[joints] - solutions[sol][joints]) * 4 + (solutions[sol][joints] - M_PI/2) * 10; //And third joints.
                         break;
                     case 3:
                         weight =  weight + std::abs(g_q_state[joints] - solutions[sol][joints]) * 2; //The rest isn't that crucial
@@ -185,11 +185,32 @@ int findOptimalSolution (std::vector<Vectorq6x1> solutions, double count){
     return bestindex;
 }
 
+/*Vectorq6x1 getVecFromBaseLinkPoint(Vector3d point){
+    return null;
+}*/
+
 
 int main(int argc, char** argv) {
     ros::init(argc, argv, "simple_marker_listener"); // this will be the node name;
     ros::NodeHandle nh;
-    ros::Publisher pub = nh.advertise<trajectory_msgs::JointTrajectory>("joint_path_command", 1);  
+    ros::Publisher pub = nh.advertise<trajectory_msgs::JointTrajectory>("joint_path_command", 1); 
+
+    bool tferr=true;
+    /*while (tferr && ros::ok()){
+        tferr=false;
+        try {
+                //try to lookup transform from target frame "odom" to source frame "map"
+            //The direction of the transform returned will be from the target_frame to the source_frame. 
+             //Which if applied to data, will transform data in the source_frame into the target_frame. See tf/CoordinateFrameConventions#Transform_Direction
+                tfListener_->lookupTransform("link1", "base_link", ros::Time(0), mapToOdom_);
+            } catch(tf::TransformException &exception) {
+                ROS_ERROR("%s", exception.what());
+                tferr=true;
+                ros::Duration(0.5).sleep(); // sleep for half a second
+                ros::spinOnce();                
+            }   
+    }*/
+
     ROS_INFO("setting up subscribers ");
     ros::Subscriber sub_js = nh.subscribe("/joint_states",1,jointStateCB);
     ros::Subscriber sub_im = nh.subscribe("example_marker/feedback", 1, markerListenerCB);
