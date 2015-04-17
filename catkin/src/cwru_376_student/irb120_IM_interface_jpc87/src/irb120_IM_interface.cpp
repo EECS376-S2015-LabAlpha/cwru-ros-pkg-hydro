@@ -19,19 +19,27 @@
 #include <sensor_msgs/JointState.h>
 #include <irb120_kinematics.h>
 
+#include <tf/transform_listener.h>
+
 //callback to subscribe to marker state
 Eigen::Vector3d g_p; //where I want to go
 Vectorq6x1 g_q_state; //where I be at
 double g_x,g_y,g_z;
 double frequency = 10.0;
+double hand_offset = .1;//offset for hand
+double elevation_approach = .2;// The apprach from above distance
 //geometry_msgs::Quaternion g_quat; // global var for quaternion
 Eigen::Quaterniond g_quat;
 Eigen::Matrix3d g_R;
 Eigen::Affine3d g_A_flange_desired;
+tf::StampedTransform bltolink1_;
+tf::Point link1_point;
+tf::TransformListener* tfListener_;
+
 bool g_trigger=false;
 using namespace std;
 
-void markerListenerCB(
+/*void markerListenerCB(
         const visualization_msgs::InteractiveMarkerFeedbackConstPtr &feedback) {
     //ROS_INFO_STREAM(feedback->marker_name << " is now at "
       //      << feedback->pose.position.x << ", " << feedback->pose.position.y
@@ -45,7 +53,7 @@ void markerListenerCB(
     g_quat.z() = feedback->pose.orientation.z;
     g_quat.w() = feedback->pose.orientation.w;   
     g_R = g_quat.matrix();
-}
+} */
 
 void jointStateCB(
 const sensor_msgs::JointStatePtr &js_msg) { //THIS IS NOT GETTING CALLED!!!! I DONT KNOW WHY... FIX!!!
@@ -58,17 +66,28 @@ const sensor_msgs::JointStatePtr &js_msg) { //THIS IS NOT GETTING CALLED!!!! I D
     
 }
 
-//start or stop continous motion
-bool triggerService(cwru_srv::simple_bool_service_messageRequest& request, cwru_srv::simple_bool_service_messageResponse& response)
-{
-    ROS_INFO("service callback activated");
-    response.resp = true; //response
-    
+//obtain point to reach from above
+void canListenerCB(
+    const tf::Point point){
+    ROS_INFO("canListenerCB callback activated");
+
+    //g_A_flange_desired.translation() = g_p;
+    //g_A_flange_desired.linear() = g_R;
+    link1_point = bltolink1_ * point;
+
+    g_p[0] = link1_point.x();
+    g_p[1] = link1_point.y();
+    g_p[2] = link1_point.z() + hand_offset + elevation_approach;
+    g_quat.x() = 0;
+    g_quat.y() = 0;
+    g_quat.z() = 1;
+    g_quat.w() = 0;   
+    g_R = g_quat.matrix();
+
     g_A_flange_desired.translation() = g_p;
     g_A_flange_desired.linear() = g_R;
+
     g_trigger=true; //flag
-    
-    return true;
 }
 
 //Used to get appropriate time based on joint movements
@@ -185,36 +204,33 @@ int findOptimalSolution (std::vector<Vectorq6x1> solutions, double count){
     return bestindex;
 }
 
-/*Vectorq6x1 getVecFromBaseLinkPoint(Vector3d point){
-    return null;
-}*/
-
-
 int main(int argc, char** argv) {
     ros::init(argc, argv, "simple_marker_listener"); // this will be the node name;
     ros::NodeHandle nh;
     ros::Publisher pub = nh.advertise<trajectory_msgs::JointTrajectory>("joint_path_command", 1); 
 
+    tfListener_ = new tf::TransformListener;  //create a transform listener
     bool tferr=true;
-    /*while (tferr && ros::ok()){
+    while (tferr && ros::ok()){
         tferr=false;
         try {
                 //try to lookup transform from target frame "odom" to source frame "map"
             //The direction of the transform returned will be from the target_frame to the source_frame. 
              //Which if applied to data, will transform data in the source_frame into the target_frame. See tf/CoordinateFrameConventions#Transform_Direction
-                tfListener_->lookupTransform("link1", "base_link", ros::Time(0), mapToOdom_);
+                tfListener_->lookupTransform("link1", "base_link", ros::Time(0), bltolink1_); //after this we can now transform baselink codes
             } catch(tf::TransformException &exception) {
                 ROS_ERROR("%s", exception.what());
                 tferr=true;
                 ros::Duration(0.5).sleep(); // sleep for half a second
                 ros::spinOnce();                
             }   
-    }*/
+    }
 
     ROS_INFO("setting up subscribers ");
     ros::Subscriber sub_js = nh.subscribe("/joint_states",1,jointStateCB);
-    ros::Subscriber sub_im = nh.subscribe("example_marker/feedback", 1, markerListenerCB);
-    ros::ServiceServer service = nh.advertiseService("move_trigger", triggerService);   
+    //ros::Subscriber sub_im = nh.subscribe("example_marker/feedback", 1, markerListenerCB);
+    ros::Subscriber sub_im = nh.subscribe("/can_point", 1, canListenerCB);
+    //ros::ServiceServer service = nh.advertiseService("move_trigger", triggerService);   
     
     Eigen::Vector3d p;
     Eigen::Vector3d n_des,t_des,b_des;
