@@ -111,7 +111,7 @@ bool modeService(cwru_srv::simple_int_service_messageRequest& request, cwru_srv:
 
 // this callback wakes up when a new "selected Points" message arrives
 void selectCB(const sensor_msgs::PointCloud2ConstPtr& cloud) {
-
+    ROS_INFO("selectCB called");
     pcl::fromROSMsg(*cloud, *g_pclSelect);
     ROS_INFO("RECEIVED NEW PATCH w/  %d * %d points", g_pclSelect->width, g_pclSelect->height);
     //ROS_INFO("frame id is: %s",cloud->header.frame_id);
@@ -525,16 +525,16 @@ int main(int argc, char** argv) {
             << " data points from test_pcd.pcd  " << std::endl;
 
     g_cloud_from_disk->header.frame_id = "kinect_pc_frame"; //looks like PCD does not encode the reference frame id
+
     double z_threshold=0.0;
     double E;
     double dEdCx=0.0;
     double dEdCy=0.0;
- 
+    
     int ans;
     Eigen::Vector3f can_center_wrt_plane;
     Eigen::Affine3f A_plane_to_sensor;
     while (ros::ok()) {
-        ROS_INFO("While loop");
         if (g_trigger) {
             g_trigger = false; // reset the trigger
 
@@ -546,6 +546,7 @@ int main(int argc, char** argv) {
                     ROS_INFO("MODE 0: identifying plane based on patch selection...");
                     find_plane(g_plane_params, g_indices_of_plane); // results in g_display_cloud (in orig frame), as well as 
                     //g_cloud_transformed (rotated version of original cloud); g_indices_of_plane indicate points on the plane
+                    ROS_INFO("Done with MODE 0");
                     break;
                 case FIND_PNTS_ABOVE_PLANE:
                     ROS_INFO("filtering for points above identified plane");
@@ -616,15 +617,11 @@ int main(int argc, char** argv) {
 
             }
         }
-        ROS_INFO("publishing pcd cloud");
         pubPcdCloud.publish(g_cloud_from_disk); //keep displaying the original scene
 
         pubCloud.publish(g_display_cloud); //and also display whatever we choose to put in here
-        ROS_INFO("Spin");
         ros::spinOnce();
-        ROS_INFO("Sleep");
         rate.sleep();
-        ROS_INFO("Done sleep");
     }
     return 0;
 }
