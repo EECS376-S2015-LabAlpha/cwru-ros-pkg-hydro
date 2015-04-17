@@ -30,6 +30,8 @@
 #include <pcl/filters/extract_indices.h>
 #include <pcl-1.7/pcl/impl/point_types.hpp>
 
+#include <visualization_msgs/Marker.h>
+
 //typedef pcl::PointCloud<pcl::PointXYZ> PointCloud; // can use this for short-hand
 
 using namespace std;
@@ -498,6 +500,30 @@ int main(int argc, char** argv) {
     ros::init(argc, argv, "process_pcl");
     ros::NodeHandle nh;
     ros::Rate rate(50);
+
+    ros::Publisher marker_pub = nh.advertise<visualization_msgs::Marker>("visualization_marker", 0);
+    visualization_msgs::Marker point;
+    point.header.frame_id = "/base_frame";
+    point.header.stamp = ros::Time::now();
+    point.ns = "points_and_lines";
+    point.action = visualization_msgs::Marker::ADD;
+    //point.pose.position.x = 0;
+    //point.pose.position.y = 0;
+    //point.pose.position.z = 0;
+    point.id = 0;
+    point.type = visualization_msgs::Marker::POINTS;
+    point.scale.x = 0.2;
+    point.scale.y = 0.2;
+    point.color.g = 1.0f;
+    point.color.a = 1.0;
+    geometry_msgs::Point p;
+    p.x = 0.0;
+    p.y = 0.0;
+    p.z = 0.0;
+    point.points.clear();
+    point.points.push_back(p);
+    marker_pub.publish(point);
+
     // Subscribers
     // use the following, if have "live" streaming from a Kinect
     //ros::Subscriber getPCLPoints = nh.subscribe<sensor_msgs::PointCloud2> ("/kinect/depth/points", 1, kinectCB);
@@ -586,6 +612,7 @@ int main(int argc, char** argv) {
                     cout<<"R_xform: "<<g_R_transform<<endl;
                     A_plane_to_sensor.linear() = g_R_transform;
                     A_plane_to_sensor.translation() = g_cylinder_origin;
+                    ROS_INFO("transform cloud");
                     transform_cloud(g_canCloud, A_plane_to_sensor, g_display_cloud);
 
                     break;
@@ -593,15 +620,23 @@ int main(int argc, char** argv) {
                         cout<<"current cx,cy = "<<can_center_wrt_plane[0]<<", "<<can_center_wrt_plane[1]<<endl;
                        // try to do something smart.  can try using dEdCy and dEdCx
                         
-                        can_center_wrt_plane[0]+= dEdCx;  //THIS was DUMB; doing SOMETHING SMART TO IMPROVE CENTER ESTIMATE
-                        can_center_wrt_plane[1]+= dEdCy;  // Moves 5 mm in the correct direction to improve center estimate
+                        can_center_wrt_plane[0]+= dEdCx*1.5;  //THIS was DUMB; doing SOMETHING SMART TO IMPROVE CENTER ESTIMATE
+                        can_center_wrt_plane[1]+= dEdCy*1.5;  // Moves 5 mm in the correct direction to improve center estimate
                     
+                        p.x = can_center_wrt_plane[0];
+                        p.y = can_center_wrt_plane[1];
+                        p.z = can_center_wrt_plane[2];
+                        point.points.clear();
+                        point.points.push_back(p);
+                        marker_pub.publish(point);
+
                     ROS_INFO("attempting to fit points to cylinder, radius %f, cx = %f, cy = %f",R_CYLINDER,can_center_wrt_plane[0],can_center_wrt_plane[1]);
                     compute_radial_error(g_cloud_transformed,indices_pts_above_plane,R_CYLINDER,can_center_wrt_plane,E,dEdCx,dEdCy);
                     cout<<"E: "<<E<<"; dEdCx: "<<dEdCx<<"; dEdCy: "<<dEdCy<<endl;
 
                     g_cylinder_origin=    g_A_plane*can_center_wrt_plane; 
                     A_plane_to_sensor.translation() = g_cylinder_origin;
+                    ROS_INFO("transform cloud");
                     transform_cloud(g_canCloud, A_plane_to_sensor, g_display_cloud);
                   
                     break;
