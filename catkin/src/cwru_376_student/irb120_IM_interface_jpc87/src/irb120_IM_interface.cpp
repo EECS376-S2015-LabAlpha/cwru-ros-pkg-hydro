@@ -5,6 +5,8 @@
 #include <ros/ros.h>
 #include <visualization_msgs/Marker.h>
 #include <geometry_msgs/Point.h>
+#include <geometry_msgs/Vector3Stamped.h>
+#include <geometry_msgs/PointStamped.h>
 #include <iostream>
 #include <sstream>
 #include <math.h>
@@ -22,16 +24,16 @@
 #include <tf/transform_listener.h>
 
 //callback to subscribe to marker state
-Eigen::Vector3d g_p; //where I want to go
+Eigen::Vector3d g_p,g_p2; //where I want to go
 Vectorq6x1 g_q_state; //where I be at
 double g_x,g_y,g_z;
 double frequency = 10.0;
 double hand_offset = .1;//offset for hand
 double elevation_approach = .2;// The apprach from above distance
 //geometry_msgs::Quaternion g_quat; // global var for quaternion
-Eigen::Quaterniond g_quat;
-Eigen::Matrix3d g_R;
-Eigen::Affine3d g_A_flange_desired;
+Eigen::Quaterniond g_quat,g_quat2;
+Eigen::Matrix3d g_R,g_R2;
+Eigen::Affine3d g_A_flange_desired,g_A_flange_desired2;
 tf::StampedTransform bltolink1_;
 tf::Point link1_point;
 tf::TransformListener* tfListener_;
@@ -67,27 +69,46 @@ const sensor_msgs::JointStatePtr &js_msg) { //THIS IS NOT GETTING CALLED!!!! I D
 }
 
 //obtain point to reach from above
-void canListenerCB(
-    const tf::Point point){
+void canListenerCB(const geometry_msgs::Pose pose){
     ROS_INFO("canListenerCB callback activated");
 
     //g_A_flange_desired.translation() = g_p;
     //g_A_flange_desired.linear() = g_R;
-    link1_point = bltolink1_ * point;
+    //link1_point = bltolink1_ * pose;
 
-    g_p[0] = link1_point.x();
-    g_p[1] = link1_point.y();
-    g_p[2] = link1_point.z() + hand_offset + elevation_approach;
-    g_quat.x() = 0;
-    g_quat.y() = 0;
-    g_quat.z() = 1;
-    g_quat.w() = 0;   
+    g_p[0] = pose.position.x;
+    g_p[1] = pose.position.y;
+    g_p[2] = pose.position.z + hand_offset + elevation_approach;
+    g_quat.x() = 0;//pose.orientation.x;
+    g_quat.y() = 0;//pose.orientation.y;
+    g_quat.z() = 1;//pose.orientation.z;
+    g_quat.w() = 0;//pose.orientation.w;  
     g_R = g_quat.matrix();
 
     g_A_flange_desired.translation() = g_p;
     g_A_flange_desired.linear() = g_R;
 
-    g_trigger=true; //flag
+    g_p2[0] = pose.position.x;
+    g_p2[1] = pose.position.y;
+    g_p2[2] = pose.position.z + (hand_offset);
+    g_quat2.x() = 0;//pose.orientation.x;
+    g_quat2.y() = 0;//pose.orientation.y;
+    g_quat2.z() = 1;//pose.orientation.z;
+    g_quat2.w() = 0;//pose.orientation.w;  
+    g_R2 = g_quat.matrix();
+
+    g_A_flange_desired2.translation() = g_p2;
+    g_A_flange_desired2.linear() = g_R2;
+
+    g_trigger=1; //flag 
+}
+
+bool triggerService(cwru_srv::simple_bool_service_messageRequest& request, cwru_srv::simple_bool_service_messageResponse& response){
+    response.resp = true;
+    //g_A_flange_desired.translation() = g_p;
+    //g_A_flange_desired.linear() = g_R;
+    g_trigger=2; //flag
+    return true;
 }
 
 //Used to get appropriate time based on joint movements
@@ -229,14 +250,15 @@ int main(int argc, char** argv) {
     ROS_INFO("setting up subscribers ");
     ros::Subscriber sub_js = nh.subscribe("/joint_states",1,jointStateCB);
     //ros::Subscriber sub_im = nh.subscribe("example_marker/feedback", 1, markerListenerCB);
-    ros::Subscriber sub_im = nh.subscribe("/can_point", 1, canListenerCB);
-    //ros::ServiceServer service = nh.advertiseService("move_trigger", triggerService);   
+    ros::Subscriber sub_pl = nh.subscribe("/can_point", 1, canListenerCB);
+    ros::ServiceServer service = nh.advertiseService("move_trigger", triggerService);   
     
     Eigen::Vector3d p;
     Eigen::Vector3d n_des,t_des,b_des;
     std::vector<Vectorq6x1> q6dof_solns;
     std::vector<Vectorq6x1> q6dof_desired_poses(2); //Array of poses to feed in
     Vectorq6x1 qvec;
+    Vectorq6x1 tvec;
     Vectorq6x1 homevec;
     ros::Rate sleep_timer(frequency); //10Hz update rate    
     Irb120_fwd_solver irb120_fwd_solver; //instantiate forward and IK solvers
@@ -255,7 +277,7 @@ int main(int argc, char** argv) {
     n_urdf_wrt_DH <<0,0,1;
     t_urdf_wrt_DH <<0,1,0;
     b_urdf_wrt_DH <<-1,0,0;
-    Eigen::Matrix3d R_urdf_wrt_DH;
+    Eigen::Matrix3d R_urdf_wrt_DH,R_urdf_wrt_DH2;
     R_urdf_wrt_DH.col(0) = n_urdf_wrt_DH;
     R_urdf_wrt_DH.col(1) = t_urdf_wrt_DH;
     R_urdf_wrt_DH.col(2) = b_urdf_wrt_DH;    
@@ -264,36 +286,46 @@ int main(int argc, char** argv) {
 
     
     homevec<<0,-M_PI/3,-M_PI/3,0,M_PI/3,0; //home state... deriably with 0, -pi/2 , pi/2 to start. This is used so that it can always get to the table from above
-    Eigen::Affine3d A_flange_des_DH;
+    Eigen::Affine3d A_flange_des_DH,A_flange_des_DH2;
+
     
     //Eigen::Affine3d A_fwd_DH = irb120_fwd_solver.fwd_kin_solve(qvec); //fwd_kin_solve
     
-    int nsolns;
+    int nsolns,nsolns2;
     while(ros::ok()) {
             ros::spinOnce();
 
-            if (g_trigger) {
+            if (g_trigger==1) {
                 // ooh!  excitement time!  got a new tool pose goal!
-                g_trigger=false; // reset the trigger
+                
                 //is this point reachable?
+
                 A_flange_des_DH = g_A_flange_desired;
                 A_flange_des_DH.linear() = g_A_flange_desired.linear()*R_urdf_wrt_DH.transpose();
-                //cout<<"R des DH: "<<endl;
-                //cout<<A_flange_des_DH.linear()<<endl;
                 nsolns = ik_solver.ik_solve(A_flange_des_DH);
+                A_flange_des_DH2 = g_A_flange_desired2;
+                A_flange_des_DH2.linear() = g_A_flange_desired2.linear()*R_urdf_wrt_DH2.transpose();
+                nsolns2 = ik_solver.ik_solve(A_flange_des_DH2);
                 ROS_INFO("there are %d solutions",nsolns);
 
                 if (nsolns>0) {      
                     ik_solver.get_solns(q6dof_solns);
                     qvec = q6dof_solns[findOptimalSolution(q6dof_solns, nsolns)]; // Choose the first solution wisely
+                    tvec = q6dof_solns[findOptimalSolution(q6dof_solns, nsolns2)];
 
-                    q6dof_desired_poses[0] = qvec; //first go to my first point
-                    q6dof_desired_poses[1] = homevec;  //then my own defined home
+                    q6dof_desired_poses[0] = qvec; //first go to a point above the object
+                    q6dof_desired_poses[1] = tvec; //approach the object and stop
                                    
-                    stuff_trajectory(q6dof_desired_poses,2,new_trajectory, 2); //2 poses feed in with a 2 sec delay in between each one
+                    stuff_trajectory(q6dof_desired_poses,2,new_trajectory, 4); //2 poses feed in with a 2 sec delay in between each one
  
                         pub.publish(new_trajectory);
                 }
+                g_trigger=0; // reset the trigger
+            }
+            else if(g_trigger == 2){
+                q6dof_desired_poses[0] = homevec;
+                stuff_trajectory(q6dof_desired_poses,2,new_trajectory, 4); //2 poses feed in with a 2 sec delay in between each one
+                pub.publish(new_trajectory);
             }
             sleep_timer.sleep();    
             
