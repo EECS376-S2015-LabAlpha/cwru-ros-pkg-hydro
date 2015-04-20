@@ -515,7 +515,7 @@ int main(int argc, char** argv) {
     std::vector<int> indices_pts_above_plane;
 
     //load a pointcloud from file: 
-    if (pcl::io::loadPCDFile<pcl::PointXYZ> ("test_pcd.pcd", *g_cloud_from_disk) == -1) //* load the file
+    /*if (pcl::io::loadPCDFile<pcl::PointXYZ> ("test_pcd.pcd", *g_cloud_from_disk) == -1) //* load the file
     {
         PCL_ERROR("Couldn't read file test_pcd.pcd \n");
         return (-1);
@@ -525,7 +525,7 @@ int main(int argc, char** argv) {
             << " data points from test_pcd.pcd  " << std::endl;
 
     g_cloud_from_disk->header.frame_id = "kinect_pc_frame"; //looks like PCD does not encode the reference frame id
-
+	*/
     double z_threshold=0.0;
     double E;
     double dEdCx=0.0;
