@@ -519,8 +519,8 @@ int main(int argc, char** argv) {
     //point.pose.position.z = 0;
     point.id = 0;
     point.type = visualization_msgs::Marker::POINTS;
-    point.scale.x = 0.1;
-    point.scale.y = 0.1;
+    point.scale.x = 0.01;
+    point.scale.y = 0.01;
     point.color.g = 1.0f;
     point.color.a = 1.0;
     geometry_msgs::Point p;
@@ -702,9 +702,9 @@ int main(int argc, char** argv) {
                     ROS_INFO("plane params: 0: %f 1: %f 2: %f 3: %f", g_plane_params[0], g_plane_params[1], g_plane_params[2], g_plane_params[3]);
                     ROS_INFO("centroid x: %f y: %f z: %f ", g_patch_centroid[0], g_patch_centroid[1], g_patch_centroid[2]);
 
-                    p2p.position.x = 1;
-                    p2p.position.y = 1;
-                    p2p.position.z = 1;
+                    p2p.position.x = ps_out.pose.position.x;
+                    p2p.position.y = ps_out.pose.position.y;
+                    p2p.position.z = ps_out.pose.position.z;
 
                     ROS_INFO("output: x: %f y: %f z: %f", p2p.position.x, p2p.position.y, p2p.position.z);
 
@@ -713,7 +713,7 @@ int main(int argc, char** argv) {
                     p2p.orientation.y = 0;
                     p2p.orientation.z = 0;
 
-                    //pubCanPoint.publish(p2p);
+                    pubCanPoint.publish(p2p);
 
                     ROS_INFO("publish done\n\n");
                     //really, this is steps 0,1,2 and 3, above
