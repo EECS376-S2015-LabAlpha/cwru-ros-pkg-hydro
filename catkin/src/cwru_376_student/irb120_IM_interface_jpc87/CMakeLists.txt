@@ -20,8 +20,7 @@ catkin_simple()
 # cs_add_libraries(my_lib src/my_lib.cpp)   
 
 # Executables
-# cs_add_executable(example src/example.cpp)
-cs_add_executable(irb120_IM_interface src/irb120_IM_interface.cpp)
+ cs_add_executable(irb120_IM_interface src/irb120_IM_interface.cpp)
 # target_link_library(example my_lib)
 
 cs_install()
