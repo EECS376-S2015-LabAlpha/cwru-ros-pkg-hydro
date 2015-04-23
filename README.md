@@ -12,3 +12,8 @@ Our package will be continuously updated as more functionality is added.  Please
 * ros-hydro-joy (for cwru_teleop)
 * ros-hydro-sound-play
 
+<<<<<<< HEAD
+=======
+##### Also Depends on catkin_simple
+* inside utils/376_utils, do `sudo dpkg -i catkin...`
+>>>>>>> b91354d23981f264182c64c21b23ea8e6d1741ee
