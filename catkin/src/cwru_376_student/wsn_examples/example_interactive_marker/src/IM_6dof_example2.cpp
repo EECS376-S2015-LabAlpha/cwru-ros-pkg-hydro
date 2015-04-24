@@ -5,7 +5,8 @@
 #include <iostream>
 #include <interactive_markers/interactive_marker_server.h>
 #include <geometry_msgs/Point.h>
-
+#include <cwru_srv/simple_bool_service_message.h> // this is a pre-defined service message, contained in shared "cwru_srv" package
+#include <cwru_srv/path_service_message.h>
 
     
     
@@ -18,8 +19,66 @@ void processFeedback(
     ROS_INFO_STREAM("reference frame is: "<<feedback->header.frame_id);
 }
 
+//utility to convert from heading to quaternion, planar motion
+geometry_msgs::Quaternion convertPlanarPhi2Quaternion(double phi) {
+    geometry_msgs::Quaternion quaternion;
+    quaternion.x = 0.0;
+    quaternion.y = 0.0;
+    quaternion.z = sin(phi/2.0);
+    quaternion.w = cos(phi/2.0);
+    return(quaternion);
+}
+
+//utility to fill a Pose object from planar x,y,phi info
+geometry_msgs::Pose xyPhi2Pose(double x, double y, double phi) {
+    geometry_msgs::Pose pose; // a pose object to populate
+    pose.orientation = convertPlanarPhi2Quaternion(phi); // convert from heading to corresponding quaternion
+    pose.position.x = x; // keep the robot on the ground!
+    pose.position.y = y; // keep the robot on the ground!    
+    pose.position.z = 0.0; // keep the robot on the ground!  
+    return pose;
+}
+
+double convertPlanarQuat2Phi(geometry_msgs::Quaternion quaternion) {
+    double quat_z = quaternion.z;
+    double quat_w = quaternion.w;
+    double phi = 2.0 * atan2(quat_z, quat_w); // cheap conversion from quaternion to heading for planar motion
+    //Make sure that the returned angle is within +- 2 * pi
+    /*while (phi < -6.2831853) {
+        phi += 6.2831853;
+    }
+    while (phi > 6.2831853) {
+        phi -= 6.2831853;
+    }*/
+    return phi;
+}
+
 int main(int argc, char** argv) {
     ros::init(argc, argv, "simple_marker"); // this will be the node name;
+
+
+
+
+
+
+
+    // geometry_msgs::Quaternion quaternion2;
+    // quaternion2.x = 0.0;
+    // quaternion2.y = 0.0;
+    // quaternion2.z = 0.9305;
+    // quaternion2.w = 0.3663;
+    // x=5.099;
+    // y=12.208;
+    // phi=convertPlanarQuat2Phi(quaternion2);
+    // ROS_INFO("vertex: x,y,phi = %f, %f %f",x,y,phi);
+    // vertex.pose = xyPhi2Pose(x,y,phi); //x,y,phi  
+    // path_message.request.path.poses.push_back(vertex);
+
+
+
+
+
+
 
     // create an interactive marker server on the topic namespace simple_marker
     interactive_markers::InteractiveMarkerServer server("example_marker");
@@ -207,6 +266,28 @@ int main(int argc, char** argv) {
     int_marker.pose.position.y = temp_point_start.y;
     int_marker.pose.position.z = temp_point_start.z;
     
+    ros::NodeHandle nh; 
+    ros::ServiceClient client = nh.serviceClient<cwru_srv::path_service_message>("appendPathService");
+
+    cwru_srv::path_service_message path_message;
+    geometry_msgs::PoseStamped vertex;  // this contains a header and a pose; the pose contains a point and a quaternion
+    double x,y,phi;
+    vertex.header.stamp = ros::Time::now();
+
+
+    geometry_msgs::Quaternion quaternion2;
+    quaternion2.x = int_marker.pose.orientation.x;
+    quaternion2.y = int_marker.pose.orientation.y;
+    quaternion2.z = int_marker.pose.orientation.z;
+    quaternion2.w = int_marker.pose.orientation.w;
+    x=int_marker.pose.position.x;
+    y=int_marker.pose.position.y;
+    phi=convertPlanarQuat2Phi(quaternion2);
+    ROS_INFO("vertex: x,y,phi = %f, %f %f",x,y,phi);
+    vertex.pose = xyPhi2Pose(x,y,phi); //x,y,phi  
+    path_message.request.path.poses.push_back(vertex);
+
+
     // add the interactive marker to our collection &
     // tell the server to call processFeedback() when feedback arrives for it
     server.insert(int_marker, &processFeedback);
