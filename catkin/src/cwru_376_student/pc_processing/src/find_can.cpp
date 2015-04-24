@@ -7,6 +7,7 @@
 
 #include <stdlib.h>
 #include <math.h>
+#include <string.h>
 #include <iostream>
 #include <ros/ros.h>
 #include <sensor_msgs/PointCloud2.h> 
@@ -30,6 +31,8 @@
 #include <pcl/filters/extract_indices.h>
 #include <pcl-1.7/pcl/impl/point_types.hpp>
 
+#include <visualization_msgs/Marker.h>
+
 //typedef pcl::PointCloud<pcl::PointXYZ> PointCloud; // can use this for short-hand
 
 using namespace std;
@@ -37,6 +40,14 @@ using namespace Eigen;
 using namespace pcl;
 using namespace pcl::io;
 
+// TF to base
+tf::TransformListener* g_tfl;
+geometry_msgs::PoseStamped ps_in;
+geometry_msgs::PoseStamped ps_out;
+
+
+// NormalEsimation documentation: http://docs.ros.org/diamondback/api/pcl/html/classpcl_1_1NormalEstimation.html
+ 
 Eigen::Vector3f computeCentroid(PointCloud<pcl::PointXYZ>::Ptr pcl_cloud);
 void computeRsqd(PointCloud<pcl::PointXYZ>::Ptr pcl_cloud, Eigen::Vector3f centroid, std::vector<float> &rsqd_vec);
 Eigen::Vector3f computeCentroid(PointCloud<pcl::PointXYZ>::Ptr pcl_cloud, std::vector<int>iselect);
@@ -51,7 +62,7 @@ void copy_cloud(PointCloud<pcl::PointXYZ>::Ptr inputCloud, vector<int> &indices,
 
 void find_plane(Eigen::Vector4f plane_params, std::vector<int> &indices_z_eps);
 
-void process_patch(std::vector<int> &iselect_filtered, Eigen::Vector3f &centroidEvec3f, Eigen::Vector4f &plane_params);
+void process_patch(std::vector<int> &iselect_filtered, Eigen::Vector3f &centroidEvec3f, Eigen::Vector3f &normalEvec3f, Eigen::Vector4f &plane_params);
 void compute_radial_error(PointCloud<pcl::PointXYZ>::Ptr inputCloud, std::vector<int> indices, double r, Eigen::Vector3f center, double &E, double &dEdCx, double &dEdCy);
 void make_can_cloud(PointCloud<pcl::PointXYZ>::Ptr canCloud, double r_can,double h_can);
 
@@ -79,8 +90,8 @@ const int FIND_ON_TABLE = 5;
 const double Z_EPS = 0.01; //choose a tolerance for plane fitting, e.g. 1cm
 const double R_EPS = 0.05; // choose a tolerance for cylinder-fit outliers
 
-const double R_CYLINDER = 0.085; //estimated from ruler tool...example to fit a cyclinder of this radius to data
-const double H_CYLINDER = 0.3; // estimated height of cylinder
+const double R_CYLINDER = 0.035; //estimated from ruler tool...example to fit a cyclinder of this radius to data
+const double H_CYLINDER = 0.125; // estimated height of cylinder
 Eigen::Vector3f g_cylinder_origin; // origin of model for cylinder registration
 
 int g_pcl_process_mode = 0; // mode--set by service
@@ -90,6 +101,7 @@ bool g_processed_patch = false; // a state--to let us know if a default set of p
 //more globals--to share info on planes and patches
 Eigen::Vector4f g_plane_params;
 Eigen::Vector3f g_patch_centroid;
+Eigen::Vector3f g_patch_normal;
 Eigen::Vector3f g_plane_normal;
 Eigen::Vector3f g_plane_origin;
 Eigen::Affine3f g_A_plane;
@@ -108,7 +120,7 @@ bool modeService(cwru_srv::simple_int_service_messageRequest& request, cwru_srv:
 
 // this callback wakes up when a new "selected Points" message arrives
 void selectCB(const sensor_msgs::PointCloud2ConstPtr& cloud) {
-
+    ROS_INFO("selectCB called");
     pcl::fromROSMsg(*cloud, *g_pclSelect);
     ROS_INFO("RECEIVED NEW PATCH w/  %d * %d points", g_pclSelect->width, g_pclSelect->height);
     //ROS_INFO("frame id is: %s",cloud->header.frame_id);
@@ -116,7 +128,7 @@ void selectCB(const sensor_msgs::PointCloud2ConstPtr& cloud) {
     int npts = g_pclSelect->width * g_pclSelect->height;
     std::vector<int> iselect_filtered; //indices of patch that do not contain outliers
 
-    process_patch(iselect_filtered, g_patch_centroid, g_plane_params); // operate on selected points to remove outliers and
+    process_patch(iselect_filtered, g_patch_centroid, g_patch_normal, g_plane_params); // operate on selected points to remove outliers and
     //find centroid and plane params
     g_processed_patch = true; // update our states to note that we have process a patch, and thus have valid plane info
 }
@@ -125,7 +137,7 @@ void selectCB(const sensor_msgs::PointCloud2ConstPtr& cloud) {
 // then compute the centroid and the plane parameters of the filtered points
 // return these values in centroidEvec3f and plane_params
 
-void process_patch(std::vector<int> &iselect_filtered, Eigen::Vector3f &centroidEvec3f, Eigen::Vector4f &plane_params) {
+void process_patch(std::vector<int> &iselect_filtered, Eigen::Vector3f &centroidEvec3f, Eigen::Vector3f &normalEvec3f, Eigen::Vector4f &plane_params) {
     ROS_INFO("PROCESSING THE PATCH: ");
     int npts = g_pclSelect->width * g_pclSelect->height;
     centroidEvec3f = computeCentroid(g_pclSelect); // compute the centroid of this point cloud (selected patch)
@@ -151,6 +163,7 @@ void process_patch(std::vector<int> &iselect_filtered, Eigen::Vector3f &centroid
     cout << "variance = " << variance << endl;
     cout << "std_dev: " << sqrt(variance) << endl;
     centroidEvec3f = computeCentroid(g_pclSelect, iselect_filtered);
+    
     cout << "refined centroid:    " << centroidEvec3f.transpose() << endl;
 
     NormalEstimation<PointXYZ, Normal> n; // object to compute the normal to a set of points
@@ -164,6 +177,11 @@ void process_patch(std::vector<int> &iselect_filtered, Eigen::Vector3f &centroid
         for (int i=0;i<3;i++)
             plane_params[i]*= -1.0;
     }
+    
+    normalEvec3f[0] = plane_params[0];
+    normalEvec3f[1] = plane_params[1];
+    normalEvec3f[2] = plane_params[2];
+    
     std::cout << "plane_params, filtered patch: " << plane_params.transpose() << std::endl;
 
 }
@@ -423,7 +441,7 @@ void make_can_cloud(PointCloud<pcl::PointXYZ>::Ptr canCloud, double r_can, doubl
             i++;
         }
     //canCloud->header = inputCloud->header;
-    canCloud->header.frame_id = "world"; 
+    canCloud->header.frame_id = "kinect_pc_frame"; 
     //canCloud->header.stamp = ros::Time::now();
     canCloud->is_dense = true;
     canCloud->width = npts;
@@ -488,7 +506,55 @@ int main(int argc, char** argv) {
     // Do some initialization here
     ros::init(argc, argv, "process_pcl");
     ros::NodeHandle nh;
-    ros::Rate rate(2);
+    ros::Rate rate(50);
+
+    ros::Publisher marker_pub = nh.advertise<visualization_msgs::Marker>("visualization_marker", 0);
+    visualization_msgs::Marker point;
+    point.header.frame_id = "/base_link";
+    point.header.stamp = ros::Time::now();
+    point.ns = "points_and_lines";
+    point.action = visualization_msgs::Marker::ADD;
+    //point.pose.position.x = 0;
+    //point.pose.position.y = 0;
+    //point.pose.position.z = 0;
+    point.id = 0;
+    point.type = visualization_msgs::Marker::POINTS;
+    point.scale.x = 0.01;
+    point.scale.y = 0.01;
+    point.color.g = 1.0f;
+    point.color.a = 1.0;
+    geometry_msgs::Point p;
+    p.x = 0.0;
+    p.y = 0.0;
+    p.z = 0.0;
+    point.points.clear();
+    point.points.push_back(p);
+    marker_pub.publish(point);
+
+    // tf stuff
+    g_tfl = new tf::TransformListener;
+    ps_in.pose.position.x = 0;
+    ps_in.pose.position.y = 0;
+    ps_in.pose.position.z = 0;
+    ps_in.pose.orientation.w = 1;
+    ps_in.pose.orientation.x = 0;
+    ps_in.pose.orientation.y = 0;
+    ps_in.pose.orientation.z = 0;
+    ps_in.header.seq = 0;
+    ps_in.header.stamp = ros::Time::now();
+    ps_in.header.frame_id = "/kinect_pc_frame";
+    ps_out.pose.position.x = 0;
+    ps_out.pose.position.y = 0;
+    ps_out.pose.position.z = 0;
+    ps_out.pose.orientation.w = 1;
+    ps_out.pose.orientation.x = 0;
+    ps_out.pose.orientation.y = 0;
+    ps_out.pose.orientation.z = 0;
+    ps_out.header.seq = 0;
+    ps_out.header.stamp = ros::Time::now();
+    ps_out.header.frame_id = "/base_link";
+
+
     // Subscribers
     // use the following, if have "live" streaming from a Kinect
     //ros::Subscriber getPCLPoints = nh.subscribe<sensor_msgs::PointCloud2> ("/kinect/depth/points", 1, kinectCB);
@@ -499,6 +565,7 @@ int main(int argc, char** argv) {
     // have rviz display both of these topics
     ros::Publisher pubCloud = nh.advertise<sensor_msgs::PointCloud2> ("/plane_model", 1);
     ros::Publisher pubPcdCloud = nh.advertise<sensor_msgs::PointCloud2> ("/kinect_pointcloud", 1);
+    ros::Publisher pubCanPoint = nh.advertise<geometry_msgs::Pose> ("/find_can", 1);
 
     // service used to interactively change processing modes
     ros::ServiceServer service = nh.advertiseService("process_mode", modeService);
@@ -515,24 +582,32 @@ int main(int argc, char** argv) {
             << g_cloud_from_disk->width * g_cloud_from_disk->height
             << " data points from test_pcd.pcd  " << std::endl;
 
-    g_cloud_from_disk->header.frame_id = "world"; //looks like PCD does not encode the reference frame id
+    g_cloud_from_disk->header.frame_id = "kinect_pc_frame"; //looks like PCD does not encode the reference frame id
+
     double z_threshold=0.0;
     double E;
     double dEdCx=0.0;
     double dEdCy=0.0;
- 
+    
     int ans;
     Eigen::Vector3f can_center_wrt_plane;
     Eigen::Affine3f A_plane_to_sensor;
+
+    geometry_msgs::Pose p2p;
+
     while (ros::ok()) {
         if (g_trigger) {
             g_trigger = false; // reset the trigger
+
+            double normal_norm = g_patch_normal.norm();
+            double can_radius = .02;                    
 
             switch (g_pcl_process_mode) { // what we do here depends on our mode; mode is settable via a service
                 case IDENTIFY_PLANE:
                     ROS_INFO("MODE 0: identifying plane based on patch selection...");
                     find_plane(g_plane_params, g_indices_of_plane); // results in g_display_cloud (in orig frame), as well as 
                     //g_cloud_transformed (rotated version of original cloud); g_indices_of_plane indicate points on the plane
+                    ROS_INFO("Done with MODE 0");
                     break;
                 case FIND_PNTS_ABOVE_PLANE:
                     ROS_INFO("filtering for points above identified plane");
@@ -548,10 +623,14 @@ int main(int argc, char** argv) {
 
                     ROS_INFO("creating a can cloud");
                     make_can_cloud(g_display_cloud, R_CYLINDER, H_CYLINDER);
-                    // rough guess--estimate coords of cylinder from  centroid of most recent patch                    
+                    // rough guess--estimate coords of cylinder from  centroid of most recent patch 
+
+                    // g_cylinder_origin = array x3 of x,y,z location for the bottom center of the can
+                    // TODO check
                     for (int i=0;i<3;i++) {
-                        g_cylinder_origin[i] = g_patch_centroid[i]; // DO BETTER THAN THIS
+                        g_cylinder_origin[i] = g_patch_centroid[i] - 3 * g_patch_normal[i]/normal_norm*can_radius; // offset it back 1 can radius
                     }
+                    ROS_INFO("cylinder origin: %f , %f, %f", g_cylinder_origin[0], g_cylinder_origin[1], g_cylinder_origin[2]);
                     
                     // fix the z-height, based on plane height:
                     g_cylinder_origin = g_cylinder_origin + (g_z_plane_nom - g_plane_normal.dot(g_cylinder_origin))*g_plane_normal;
@@ -563,11 +642,13 @@ int main(int argc, char** argv) {
                     cout<<"initial guess for cylinder fit: "<<endl;
                     cout<<" attempting fit at c = "<<can_center_wrt_plane.transpose()<<endl;                
 
+                    // TODO check, but I think this is right
                     compute_radial_error(g_cloud_transformed,indices_pts_above_plane,R_CYLINDER,can_center_wrt_plane,E,dEdCx,dEdCy);
                     cout<<"E: "<<E<<"; dEdCx: "<<dEdCx<<"; dEdCy: "<<dEdCy<<endl;
                     cout<<"R_xform: "<<g_R_transform<<endl;
                     A_plane_to_sensor.linear() = g_R_transform;
                     A_plane_to_sensor.translation() = g_cylinder_origin;
+                    ROS_INFO("transform cloud");
                     transform_cloud(g_canCloud, A_plane_to_sensor, g_display_cloud);
 
                     break;
@@ -575,15 +656,39 @@ int main(int argc, char** argv) {
                         cout<<"current cx,cy = "<<can_center_wrt_plane[0]<<", "<<can_center_wrt_plane[1]<<endl;
                        // try to do something smart.  can try using dEdCy and dEdCx
                         
-                        can_center_wrt_plane[0]+= 0.0;  //THIS IS DUMB; DO SOMETHING SMART TO IMPROVE CENTER ESTIMATE
-                        can_center_wrt_plane[1]+= 0.0; 
+                        can_center_wrt_plane[0]-= dEdCx*1.5;  //THIS was DUMB; doing SOMETHING SMART TO IMPROVE CENTER ESTIMATE
+                        can_center_wrt_plane[1]-= dEdCy*1.5;  // Moves 5 mm in the correct direction to improve center estimate
                     
+                        p.x = can_center_wrt_plane[0];
+                        p.y = can_center_wrt_plane[1];
+                        p.z = can_center_wrt_plane[2];
+                        ps_in.pose.position = p;
+
                     ROS_INFO("attempting to fit points to cylinder, radius %f, cx = %f, cy = %f",R_CYLINDER,can_center_wrt_plane[0],can_center_wrt_plane[1]);
                     compute_radial_error(g_cloud_transformed,indices_pts_above_plane,R_CYLINDER,can_center_wrt_plane,E,dEdCx,dEdCy);
                     cout<<"E: "<<E<<"; dEdCx: "<<dEdCx<<"; dEdCy: "<<dEdCy<<endl;
 
                     g_cylinder_origin=    g_A_plane*can_center_wrt_plane; 
+
+                        p.x = g_cylinder_origin[0];
+                        p.y = g_cylinder_origin[1];
+                        p.z = g_cylinder_origin[2];
+                        ps_in.pose.position = p;
+                        ps_out.pose.position = p;
+                        ROS_INFO("ps_in: %f , %f , %f", ps_in.pose.position.x, ps_in.pose.position.y, ps_in.pose.position.z);
+                        ROS_INFO("ps_in: frame: %s", ps_in.header.frame_id.c_str());
+                        g_tfl->transformPose("base_link", ps_in, ps_out);
+                        ps_out.pose.position.z += H_CYLINDER;
+                        ROS_INFO("ps_out: %f , %f , %f", ps_out.pose.position.x, ps_out.pose.position.y, ps_out.pose.position.z);
+                        ROS_INFO("ps_out: frame: %s", ps_out.header.frame_id.c_str());
+                        point.points.clear();
+                        //point.points.push_back(p);
+                        point.points.push_back(ps_out.pose.position);
+                        marker_pub.publish(point);
+
                     A_plane_to_sensor.translation() = g_cylinder_origin;
+                    ROS_INFO("cylinder origin: %f , %f, %f", g_cylinder_origin[0], g_cylinder_origin[1], g_cylinder_origin[2]);
+                    ROS_INFO("transform cloud");
                     transform_cloud(g_canCloud, A_plane_to_sensor, g_display_cloud);
                   
                     break;
@@ -591,7 +696,26 @@ int main(int argc, char** argv) {
 
 
                 case FIND_ON_TABLE:
-                    ROS_INFO("filtering for objects on most recently defined plane: not implemented yet");
+                    ROS_INFO("Publish can poiont");
+
+                    ROS_INFO("plane x: %f y: %f", can_center_wrt_plane[0], can_center_wrt_plane[1]);
+                    ROS_INFO("plane params: 0: %f 1: %f 2: %f 3: %f", g_plane_params[0], g_plane_params[1], g_plane_params[2], g_plane_params[3]);
+                    ROS_INFO("centroid x: %f y: %f z: %f ", g_patch_centroid[0], g_patch_centroid[1], g_patch_centroid[2]);
+
+                    p2p.position.x = ps_out.pose.position.x;
+                    p2p.position.y = ps_out.pose.position.y;
+                    p2p.position.z = ps_out.pose.position.z;
+
+                    ROS_INFO("output: x: %f y: %f z: %f", p2p.position.x, p2p.position.y, p2p.position.z);
+
+                    p2p.orientation.w = 1;
+                    p2p.orientation.x = 0;
+                    p2p.orientation.y = 0;
+                    p2p.orientation.z = 0;
+
+                    pubCanPoint.publish(p2p);
+
+                    ROS_INFO("publish done\n\n");
                     //really, this is steps 0,1,2 and 3, above
                     break;
                 default:
@@ -599,11 +723,9 @@ int main(int argc, char** argv) {
 
             }
         }
-
         pubPcdCloud.publish(g_cloud_from_disk); //keep displaying the original scene
 
         pubCloud.publish(g_display_cloud); //and also display whatever we choose to put in here
-
         ros::spinOnce();
         rate.sleep();
     }
