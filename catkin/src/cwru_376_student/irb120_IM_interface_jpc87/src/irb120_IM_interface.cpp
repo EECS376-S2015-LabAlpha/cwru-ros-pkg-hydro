@@ -109,7 +109,8 @@ bool triggerService(cwru_srv::simple_bool_service_messageRequest& request, cwru_
     response.resp = true;
     //g_A_flange_desired.translation() = g_p;
     //g_A_flange_desired.linear() = g_R;
-    /////TEST
+    /////TEST 
+    /*
     if(test == 0){
         test = 1;
         g_p[0] = .25 - hand_offset - elevation_approach;
@@ -131,9 +132,9 @@ bool triggerService(cwru_srv::simple_bool_service_messageRequest& request, cwru_
         g_trigger=2.0;
     }
     
-
-    /*
-    g_trigger=2.0; //flag*/
+    */
+    
+    g_trigger=2.0; //flag
     return true;
 }
 
