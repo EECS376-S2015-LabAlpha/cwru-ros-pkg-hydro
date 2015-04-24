@@ -30,6 +30,7 @@ double g_x,g_y,g_z;
 double frequency = 10.0;
 double hand_offset = .1;//offset for hand
 double elevation_approach = .2;// The apprach from above distance
+double cartesian_subdivide = .02;
 //geometry_msgs::Quaternion g_quat; // global var for quaternion
 Eigen::Quaterniond g_quat,g_quat2;
 Eigen::Matrix3d g_R,g_R2;
@@ -63,7 +64,7 @@ void jointStateCB(
 const sensor_msgs::JointStatePtr &js_msg) { //THIS IS NOT GETTING CALLED!!!! I DONT KNOW WHY... FIX!!!
     
     for (int i=0;i<6;i++) {
-        g_q_state[i] = js_msg->position[i+4]; //Based on the data, the first joint starts at index 4
+        g_q_state[i] = js_msg->position[i + 4]; //Based on the data, the first joint starts at index 4
         //ROS_INFO("q_p_state is %f for %d",g_q_state[i + 4],i);
     }
     //cout<<"g_q_state: "<<g_q_state.transpose()<<endl;
@@ -76,9 +77,9 @@ void canListenerCB(const geometry_msgs::PoseStamped &g_marker_pose_in){
 
     g_tfListener->transformPose("link1", g_marker_pose_in, g_marker_pose_wrt_arm_base);
 
-    g_p[0] = g_marker_pose_wrt_arm_base.pose.position.x;
+    g_p[0] = g_marker_pose_wrt_arm_base.pose.position.x + hand_offset + elevation_approach;
     g_p[1] = g_marker_pose_wrt_arm_base.pose.position.y;
-    g_p[2] = g_marker_pose_wrt_arm_base.pose.position.z + hand_offset + elevation_approach;
+    g_p[2] = g_marker_pose_wrt_arm_base.pose.position.z;
     g_quat.x() = 1;//pose.orientation.x;
     g_quat.y() = 0;//pose.orientation.y;
     g_quat.z() = 0;//pose.orientation.z;
@@ -88,6 +89,7 @@ void canListenerCB(const geometry_msgs::PoseStamped &g_marker_pose_in){
     g_A_flange_desired.translation() = g_p;
     g_A_flange_desired.linear() = g_R;
 
+    /*
     g_p2[0] = g_marker_pose_wrt_arm_base.pose.position.x;
     g_p2[1] = g_marker_pose_wrt_arm_base.pose.position.y;
     g_p2[2] = g_marker_pose_wrt_arm_base.pose.position.z + (hand_offset);
@@ -98,7 +100,7 @@ void canListenerCB(const geometry_msgs::PoseStamped &g_marker_pose_in){
     g_R2 = g_quat.matrix();
 
     g_A_flange_desired2.translation() = g_p2;
-    g_A_flange_desired2.linear() = g_R2;
+    g_A_flange_desired2.linear() = g_R2; */
 
     g_trigger=1.0; //flag 
 }
@@ -122,15 +124,7 @@ bool triggerService(cwru_srv::simple_bool_service_messageRequest& request, cwru_
         g_A_flange_desired.translation() = g_p;
         g_A_flange_desired.linear() = g_R;
 
-        g_p2[0] = .25 - hand_offset;
-        g_p2[1] = 0;
-        g_p2[2] = .8;
-        g_R2 = g_R;
-
-        g_A_flange_desired2.translation() = g_p2;
-        g_A_flange_desired2.linear() = g_R2;
-
-        g_trigger=1.0; //flag */
+        g_trigger=1.0; //flag 
     }
     else {
         test = 0;
@@ -163,7 +157,7 @@ double getTimeTraversalFromJoints(Vectorq6x1 initial_state, Vectorq6x1 end){
         }
         
         duration +=  weight * std::abs(initial_state[joints] - end[joints]);
-        ROS_INFO("joint %d, init %f, end %f",joints,initial_state[joints], end[joints]);
+        //ROS_INFO("joint %d, init %f, end %f",joints,initial_state[joints], end[joints]);
         
     }
     ROS_INFO("time is %f",duration);
@@ -301,14 +295,10 @@ int main(int argc, char** argv) {
     
     Eigen::Vector3d p;
     Eigen::Vector3d n_des,t_des,b_des;
-    std::vector<Vectorq6x1> q6dof_solns, q6dof_solns2;
-    std::vector<Vectorq6x1> q6dof_desired_poses(2); //Array of poses to feed in
-    Vectorq6x1 qvec;
-    Vectorq6x1 tvec;
+    Vectorq6x1 qvec,tvec;
     Vectorq6x1 homevec,homevecup;
     ros::Rate sleep_timer(frequency); //10Hz update rate    
     Irb120_fwd_solver irb120_fwd_solver; //instantiate forward and IK solvers
-    Irb120_IK_solver ik_solver, ik_solver2;
     Eigen::Vector3d n_urdf_wrt_DH,t_urdf_wrt_DH,b_urdf_wrt_DH;
     // in home pose, R_urdf = I
     //DH-defined tool-flange axes point as:
@@ -323,21 +313,19 @@ int main(int argc, char** argv) {
     n_urdf_wrt_DH <<0,0,1;
     t_urdf_wrt_DH <<0,1,0;
     b_urdf_wrt_DH <<-1,0,0;
-    Eigen::Matrix3d R_urdf_wrt_DH,R_urdf_wrt_DH2;
+    Eigen::Matrix3d R_urdf_wrt_DH;
     R_urdf_wrt_DH.col(0) = n_urdf_wrt_DH;
     R_urdf_wrt_DH.col(1) = t_urdf_wrt_DH;
     R_urdf_wrt_DH.col(2) = b_urdf_wrt_DH;    
-
-    R_urdf_wrt_DH2.col(0) = n_urdf_wrt_DH;
-    R_urdf_wrt_DH2.col(1) = t_urdf_wrt_DH;
-    R_urdf_wrt_DH2.col(2) = b_urdf_wrt_DH;
+    bool atpoint = false;
 
     trajectory_msgs::JointTrajectory new_trajectory; // an empty trajectory
 
     homevecup<<0,-M_PI/3,-M_PI/3,0,M_PI/3,0;
     homevec<<-1.6,-1.6,-1,0,1,0; //home state... deriably with 0, -pi/2 , pi/2 to start. This is used so that it can always get to the table from above
+    qvec = homevecup;
     
-    Eigen::Affine3d A_flange_des_DH,A_flange_des_DH2;
+    Eigen::Affine3d next_flange;
 
     
     //Eigen::Affine3d A_fwd_DH = irb120_fwd_solver.fwd_kin_solve(qvec); //fwd_kin_solve
@@ -352,37 +340,125 @@ int main(int argc, char** argv) {
                     
                     //is this point reachable?
 
-                    A_flange_des_DH = g_A_flange_desired;
-                    A_flange_des_DH.linear() = g_A_flange_desired.linear()*R_urdf_wrt_DH.transpose();
-                    nsolns = ik_solver.ik_solve(A_flange_des_DH);
+                    next_flange = g_A_flange_desired;
 
-                    A_flange_des_DH2 = g_A_flange_desired2;
-                    A_flange_des_DH2.linear() = g_A_flange_desired2.linear()*R_urdf_wrt_DH2.transpose();
-                    nsolns2 = ik_solver2.ik_solve(A_flange_des_DH2);
+                    bool allsolutions = true;
+                    int num = elevation_approach / cartesian_subdivide;
+                    ROS_INFO("number is %d", num);
+                    std::vector<Vectorq6x1> q6dof_desired_poses(num); //Array of poses to feed in
+                    int i;
 
-                    ROS_INFO("there are %d and %d solutions",nsolns, nsolns2);
+                    //Lets subdivide from above
+                    for(i = 0; i < num; i++){
 
-                    if (nsolns>0 && nsolns2>0) {      
-                        ik_solver.get_solns(q6dof_solns);
-                        qvec = q6dof_solns[findOptimalSolution(q6dof_solns, nsolns)]; // Choose the first solution wisely
+                        Eigen::Affine3d A_flange_des_DH;
+                        Irb120_IK_solver ik_solver;
+                        std::vector<Vectorq6x1> q6dof_solns;
+                        Vectorq6x1 qvec;
 
-                        ik_solver2.get_solns(q6dof_solns2);
-                        tvec = q6dof_solns2[findOptimalSolution(q6dof_solns2, nsolns2)];
+                        Eigen::Vector3d g_p_temp;
+                        Eigen::Matrix3d g_R_temp;
+                        Eigen::Quaterniond g_quat_temp;
 
-                        q6dof_desired_poses[0] = qvec; //first go to a point above the object
-                        q6dof_desired_poses[1] = tvec; //approach the object and stop
-                                       
-                        stuff_trajectory(q6dof_desired_poses,2,new_trajectory, 1); //2 poses feed in with a 4 sec delay in between each one
+                        g_p_temp[0] = g_p[0] + cartesian_subdivide * i;
+                        g_p_temp[1] = g_p[1];
+                        g_p_temp[2] = g_p[2];
+                        g_quat_temp.x() = 1;//pose.orientation.x;
+                        g_quat_temp.y() = 0;//pose.orientation.y;
+                        g_quat_temp.z() = 0;//pose.orientation.z;
+                        g_quat_temp.w() = 0;//pose.orientation.w;  
+                        g_R_temp = g_quat_temp.matrix();
+
+                        next_flange.translation() = g_p_temp;
+                        next_flange.linear() = g_R_temp;
+
+                        A_flange_des_DH = next_flange; //May not work
+                        next_flange.linear() = next_flange.linear()*R_urdf_wrt_DH.transpose();
+                        nsolns = ik_solver.ik_solve(next_flange);
+
+                        if(nsolns == 0){
+                            allsolutions = false;
+                            ROS_INFO("All points dont have solutions");
+                            break;
+                        }
+                        else{
+                            ik_solver.get_solns(q6dof_solns);
+                            q6dof_desired_poses[i] = q6dof_solns[findOptimalSolution(q6dof_solns, nsolns)]; // Choose the first solution wisely
+                        }
+                    }
+
+                    if (allsolutions==true) {                                             
+                        stuff_trajectory(q6dof_desired_poses,num,new_trajectory, 0); //2 poses feed in with a 4 sec delay in between each one
+                        pub.publish(new_trajectory);
+                        atpoint = true;
                     }
                 }
                 else if(g_trigger == 2){
-                    q6dof_desired_poses[0] = homevecup;
-                    q6dof_desired_poses[1] = homevec;
-                    stuff_trajectory(q6dof_desired_poses,2,new_trajectory, 1); //2 poses feed in with a 4 sec delay in between each one
+                    if(atpoint){
+                        next_flange = g_A_flange_desired;
+
+                        bool allsolutions = true;
+                        int num = elevation_approach / cartesian_subdivide + 1;
+                        ROS_INFO("number is %d", num);
+                        std::vector<Vectorq6x1> q6dof_desired_poses(num); //Array of poses to feed in
+                        int i;
+
+                        for(i = num - 2; i > -1; i--){
+
+                            Eigen::Affine3d A_flange_des_DH;
+                            Irb120_IK_solver ik_solver;
+                            std::vector<Vectorq6x1> q6dof_solns;
+                            Vectorq6x1 qvec;
+
+                            Eigen::Vector3d g_p_temp;
+                            Eigen::Matrix3d g_R_temp;
+                            Eigen::Quaterniond g_quat_temp;
+
+                            g_p_temp[0] = g_p[0] + cartesian_subdivide * i;
+                            g_p_temp[1] = g_p[1];
+                            g_p_temp[2] = g_p[2];
+                            g_quat_temp.x() = 1;//pose.orientation.x;
+                            g_quat_temp.y() = 0;//pose.orientation.y;
+                            g_quat_temp.z() = 0;//pose.orientation.z;
+                            g_quat_temp.w() = 0;//pose.orientation.w;  
+                            g_R_temp = g_quat_temp.matrix();
+
+                            next_flange.translation() = g_p_temp;
+                            next_flange.linear() = g_R_temp;
+
+                            A_flange_des_DH = next_flange; //May not work
+                            next_flange.linear() = next_flange.linear()*R_urdf_wrt_DH.transpose();
+                            nsolns = ik_solver.ik_solve(next_flange);
+
+                            if(nsolns == 0){
+                                allsolutions = false;
+                                ROS_INFO("All points dont have solutions");
+                                break;
+                            }
+                            else{
+                                ik_solver.get_solns(q6dof_solns);
+                                q6dof_desired_poses[num - i - 2] = q6dof_solns[findOptimalSolution(q6dof_solns, nsolns)]; // Choose the first solution wisely
+                            }
+                        }
+
+                        if (allsolutions==true) {
+                            ROS_INFO("going backwards");
+                            q6dof_desired_poses[num - 1] = homevec;                                            
+                            stuff_trajectory(q6dof_desired_poses,num,new_trajectory, 0); //2 poses feed in with a 4 sec delay in between each one
+                            pub.publish(new_trajectory);
+                        }
+                    }
+                    else {
+                        std::vector<Vectorq6x1> q6dof_desired_poses(2); //Array of poses to feed in
+                            q6dof_desired_poses[0] = qvec;
+                            q6dof_desired_poses[1] = homevec;
+                            stuff_trajectory(q6dof_desired_poses,2,new_trajectory, 1); //2 poses feed in with a 4 sec delay in between each one
+                            pub.publish(new_trajectory);
+                    }
+                    atpoint = false;
+                    
                 }
-                pub.publish(new_trajectory);
                 g_trigger=0; // reset the trigger
-                  
             }
             sleep_timer.sleep(); 
     }
