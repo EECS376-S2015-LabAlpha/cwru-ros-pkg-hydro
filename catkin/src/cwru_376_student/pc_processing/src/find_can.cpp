@@ -565,7 +565,7 @@ int main(int argc, char** argv) {
     // have rviz display both of these topics
     ros::Publisher pubCloud = nh.advertise<sensor_msgs::PointCloud2> ("/plane_model", 1);
     ros::Publisher pubPcdCloud = nh.advertise<sensor_msgs::PointCloud2> ("/kinect_pointcloud", 1);
-    ros::Publisher pubCanPoint = nh.advertise<geometry_msgs::Pose> ("/find_can", 1);
+    ros::Publisher pubCanPoint = nh.advertise<geometry_msgs::PoseStamped> ("/find_can", 1);
 
     // service used to interactively change processing modes
     ros::ServiceServer service = nh.advertiseService("process_mode", modeService);
@@ -593,7 +593,9 @@ int main(int argc, char** argv) {
     Eigen::Vector3f can_center_wrt_plane;
     Eigen::Affine3f A_plane_to_sensor;
 
-    geometry_msgs::Pose p2p;
+    geometry_msgs::PoseStamped p2p;
+    p2p.header.frame_id = "base_link";
+    p2p.header.stamp = ros::Time::now();
 
     while (ros::ok()) {
         if (g_trigger) {
@@ -702,16 +704,17 @@ int main(int argc, char** argv) {
                     ROS_INFO("plane params: 0: %f 1: %f 2: %f 3: %f", g_plane_params[0], g_plane_params[1], g_plane_params[2], g_plane_params[3]);
                     ROS_INFO("centroid x: %f y: %f z: %f ", g_patch_centroid[0], g_patch_centroid[1], g_patch_centroid[2]);
 
-                    p2p.position.x = ps_out.pose.position.x;
-                    p2p.position.y = ps_out.pose.position.y;
-                    p2p.position.z = ps_out.pose.position.z;
+                    p2p.pose.position.x = ps_out.pose.position.x;
+                    p2p.pose.position.y = ps_out.pose.position.y;
+                    p2p.pose.position.z = ps_out.pose.position.z;
 
-                    ROS_INFO("output: x: %f y: %f z: %f", p2p.position.x, p2p.position.y, p2p.position.z);
+                    ROS_INFO("output: x: %f y: %f z: %f", p2p.pose.position.x, p2p.pose.position.y, p2p.pose.position.z);
 
-                    p2p.orientation.w = 1;
-                    p2p.orientation.x = 0;
-                    p2p.orientation.y = 0;
-                    p2p.orientation.z = 0;
+                    p2p.pose.orientation.w = 1;
+                    p2p.pose.orientation.x = 0;
+                    p2p.pose.orientation.y = 0;
+                    p2p.pose.orientation.z = 0;
+                    p2p.header.stamp = ros::Time::now();
 
                     pubCanPoint.publish(p2p);
 

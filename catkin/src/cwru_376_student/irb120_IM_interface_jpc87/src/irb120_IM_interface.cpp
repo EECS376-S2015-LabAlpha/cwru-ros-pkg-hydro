@@ -28,8 +28,8 @@ Eigen::Vector3d g_p,g_p2; //where I want to go
 Vectorq6x1 g_q_state; //where I be at
 double g_x,g_y,g_z;
 double frequency = 10.0;
-double hand_offset = .1;//offset for hand
-double elevation_approach = .2;// The apprach from above distance
+double hand_offset = .14;//offset for hand
+double elevation_approach = .15;// The apprach from above distance
 double cartesian_subdivide = .02;
 //geometry_msgs::Quaternion g_quat; // global var for quaternion
 Eigen::Quaterniond g_quat,g_quat2;
@@ -39,26 +39,29 @@ tf::StampedTransform bltolink1_;
 tf::TransformListener* g_tfListener;
 int test = 1;
 
-geometry_msgs::PoseStamped g_marker_pose_wrt_arm_base;
-
+geometry_msgs::PoseStamped g_marker_pose_wrt_arm_base,g_marker_pose_in;
 int g_trigger=0;
 using namespace std;
 
-/*void markerListenerCB(
+void markerListenerCB(
         const visualization_msgs::InteractiveMarkerFeedbackConstPtr &feedback) {
-    //ROS_INFO_STREAM(feedback->marker_name << " is now at "
-      //      << feedback->pose.position.x << ", " << feedback->pose.position.y
-        //    << ", " << feedback->pose.position.z);
-    //copy to global vars:
-    g_p[0] = feedback->pose.position.x;
-    g_p[1] = feedback->pose.position.y;
-    g_p[2] = feedback->pose.position.z;
-    g_quat.x() = feedback->pose.orientation.x;
-    g_quat.y() = feedback->pose.orientation.y;
-    g_quat.z() = feedback->pose.orientation.z;
-    g_quat.w() = feedback->pose.orientation.w;   
-    g_R = g_quat.matrix();
-}*/
+    ROS_INFO_STREAM("marker frame_id is "<<feedback->header.frame_id);
+    g_marker_pose_in.header = feedback->header;
+    g_marker_pose_in.pose=feedback->pose;
+     g_tfListener->transformPose("link1", g_marker_pose_in, g_marker_pose_wrt_arm_base);
+     
+    g_p[0] = g_marker_pose_wrt_arm_base.pose.position.x - hand_offset;
+    g_p[1] = g_marker_pose_wrt_arm_base.pose.position.y;
+    g_p[2] = g_marker_pose_wrt_arm_base.pose.position.z;
+    ROS_INFO("Going to x: %f y: %f z: %f ",g_p[0],g_p[1],g_p[2]);
+    g_quat.x() = 0;//pose.orientation.x;
+    g_quat.y() = 0;//pose.orientation.y;
+    g_quat.z() = 0;//pose.orientation.z;
+    g_quat.w() = 1;//pose.orientation.w;  
+    g_R = g_quat.matrix();      
+
+
+}
 
 void jointStateCB(
 const sensor_msgs::JointStatePtr &js_msg) { //THIS IS NOT GETTING CALLED!!!! I DONT KNOW WHY... FIX!!!
@@ -72,37 +75,24 @@ const sensor_msgs::JointStatePtr &js_msg) { //THIS IS NOT GETTING CALLED!!!! I D
 }
 
 //obtain point to reach from above
-void canListenerCB(const geometry_msgs::PoseStamped &g_marker_pose_in){
+void canListenerCB(const geometry_msgs::PoseStamped &pose){
     ROS_INFO("canListenerCB callback activated");
+    g_tfListener->transformPose("link1", pose, g_marker_pose_wrt_arm_base);
 
-    g_tfListener->transformPose("link1", g_marker_pose_in, g_marker_pose_wrt_arm_base);
-
-    g_p[0] = g_marker_pose_wrt_arm_base.pose.position.x + hand_offset + elevation_approach;
+    g_p[0] = g_marker_pose_wrt_arm_base.pose.position.x - hand_offset - elevation_approach;
     g_p[1] = g_marker_pose_wrt_arm_base.pose.position.y;
     g_p[2] = g_marker_pose_wrt_arm_base.pose.position.z;
-    g_quat.x() = 1;//pose.orientation.x;
+    ROS_INFO("Going to x: %f y: %f z: %f ",g_p[0],g_p[1],g_p[2]);
+    g_quat.x() = 0;//pose.orientation.x;
     g_quat.y() = 0;//pose.orientation.y;
     g_quat.z() = 0;//pose.orientation.z;
-    g_quat.w() = 0;//pose.orientation.w;  
+    g_quat.w() = 1;//pose.orientation.w;  
     g_R = g_quat.matrix();
 
     g_A_flange_desired.translation() = g_p;
     g_A_flange_desired.linear() = g_R;
 
-    /*
-    g_p2[0] = g_marker_pose_wrt_arm_base.pose.position.x;
-    g_p2[1] = g_marker_pose_wrt_arm_base.pose.position.y;
-    g_p2[2] = g_marker_pose_wrt_arm_base.pose.position.z + (hand_offset);
-    g_quat2.x() = 1;//pose.orientation.x;
-    g_quat2.y() = 0;//pose.orientation.y;
-    g_quat2.z() = 0;//pose.orientation.z;
-    g_quat2.w() = 0;//pose.orientation.w;  
-    g_R2 = g_quat.matrix();
-
-    g_A_flange_desired2.translation() = g_p2;
-    g_A_flange_desired2.linear() = g_R2; */
-
-    g_trigger=1.0; //flag 
+    g_trigger=1; //flag 
 }
 
 bool triggerService(cwru_srv::simple_bool_service_messageRequest& request, cwru_srv::simple_bool_service_messageResponse& response){
@@ -110,31 +100,40 @@ bool triggerService(cwru_srv::simple_bool_service_messageRequest& request, cwru_
     //g_A_flange_desired.translation() = g_p;
     //g_A_flange_desired.linear() = g_R;
     /////TEST 
-    /*
-    if(test == 0){
-        test = 1;
-        g_p[0] = .25 - hand_offset - elevation_approach;
-        g_p[1] = 0;
-        g_p[2] = .8;
-        g_quat.x() = 0;//pose.orientation.x;
-        g_quat.y() = 0;//pose.orientation.y;
-        g_quat.z() = 0;//pose.orientation.z;
-        g_quat.w() = 1;//pose.orientation.w;  
-        g_R = g_quat.matrix();
+    if (request.req == 1){
+        ROS_INFO("Test case 1 called");
+        if(test == 0){
+            test = 1;
+            g_p[0] = 1.15 - hand_offset - elevation_approach;
+            g_p[1] = 0;
+            g_p[2] = .8;
+            g_quat.x() = 0;//pose.orientation.x;
+            g_quat.y() = 0;//pose.orientation.y;
+            g_quat.z() = 0;//pose.orientation.z;
+            g_quat.w() = 1;//pose.orientation.w;  
+            g_R = g_quat.matrix();
 
+            g_A_flange_desired.translation() = g_p;
+            g_A_flange_desired.linear() = g_R;
+
+            g_trigger=1.0; //flag 
+        }
+        else {
+            test = 0;
+            g_trigger=2;
+        }
+    }
+    else if (request.req == 2) //assumes marker is being used
+    {
+        ROS_INFO("Marker case called, assuming marker is being used");
+        g_trigger = 1;
         g_A_flange_desired.translation() = g_p;
         g_A_flange_desired.linear() = g_R;
-
-        g_trigger=1.0; //flag 
     }
-    else {
-        test = 0;
-        g_trigger=2.0;
+    else{ //move away
+        ROS_INFO("Groing back");
+        g_trigger=2; //flag
     }
-    
-    */
-    
-    g_trigger=2.0; //flag
     return true;
 }
 
@@ -272,7 +271,7 @@ int main(int argc, char** argv) {
     bool tferr=true;
     ROS_INFO("waiting for tf between base_link and link1 of arm...");
     g_tfListener = new tf::TransformListener;  //create a transform listener
-    while (tferr) {
+    while (tferr & ros::ok()) {
         tferr=false;
         try {
                 //try to lookup transform from target frame "odom" to source frame "map"
@@ -290,8 +289,8 @@ int main(int argc, char** argv) {
 
     ROS_INFO("setting up subscribers ");
     ros::Subscriber sub_js = nh.subscribe("/joint_states",1,jointStateCB);
-    //ros::Subscriber sub_im = nh.subscribe("example_marker/feedback", 1, markerListenerCB);
-    ros::Subscriber sub_pl = nh.subscribe("/can_point", 1, canListenerCB);
+    ros::Subscriber sub_im = nh.subscribe("example_marker/feedback", 1, markerListenerCB);
+    ros::Subscriber sub_pl = nh.subscribe("/find_can", 1, canListenerCB);
     ros::ServiceServer service = nh.advertiseService("move_trigger", triggerService);   
     
     Eigen::Vector3d p;
@@ -364,10 +363,10 @@ int main(int argc, char** argv) {
                         g_p_temp[0] = g_p[0] + cartesian_subdivide * i;
                         g_p_temp[1] = g_p[1];
                         g_p_temp[2] = g_p[2];
-                        g_quat_temp.x() = 1;//pose.orientation.x;
+                        g_quat_temp.x() = 0;//pose.orientation.x;
                         g_quat_temp.y() = 0;//pose.orientation.y;
                         g_quat_temp.z() = 0;//pose.orientation.z;
-                        g_quat_temp.w() = 0;//pose.orientation.w;  
+                        g_quat_temp.w() = 1;//pose.orientation.w;  
                         g_R_temp = g_quat_temp.matrix();
 
                         next_flange.translation() = g_p_temp;
@@ -379,6 +378,7 @@ int main(int argc, char** argv) {
 
                         if(nsolns == 0){
                             allsolutions = false;
+                            cout<<""<<next_flange.translation()<<endl;
                             ROS_INFO("All points dont have solutions");
                             break;
                         }
@@ -418,10 +418,10 @@ int main(int argc, char** argv) {
                             g_p_temp[0] = g_p[0] + cartesian_subdivide * i;
                             g_p_temp[1] = g_p[1];
                             g_p_temp[2] = g_p[2];
-                            g_quat_temp.x() = 1;//pose.orientation.x;
+                            g_quat_temp.x() = 0;//pose.orientation.x;
                             g_quat_temp.y() = 0;//pose.orientation.y;
                             g_quat_temp.z() = 0;//pose.orientation.z;
-                            g_quat_temp.w() = 0;//pose.orientation.w;  
+                            g_quat_temp.w() = 1;//pose.orientation.w;  
                             g_R_temp = g_quat_temp.matrix();
 
                             next_flange.translation() = g_p_temp;
@@ -433,7 +433,8 @@ int main(int argc, char** argv) {
 
                             if(nsolns == 0){
                                 allsolutions = false;
-                                ROS_INFO("All points dont have solutions");
+                                cout<<""<<next_flange.linear()<<endl;
+                                ROS_INFO("All points dont have solutions at %d",i);
                                 break;
                             }
                             else{
