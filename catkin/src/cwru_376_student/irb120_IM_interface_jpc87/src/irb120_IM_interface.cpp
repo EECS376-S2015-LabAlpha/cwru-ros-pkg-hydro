@@ -28,9 +28,9 @@ Eigen::Vector3d g_p,g_p2; //where I want to go
 Vectorq6x1 g_q_state; //where I be at
 double g_x,g_y,g_z;
 double frequency = 10.0;
-double hand_offset = .14;//offset for hand
-double elevation_approach = .15;// The apprach from above distance
-double cartesian_subdivide = .02;
+double hand_offset = .08;//offset for hand
+double elevation_approach = .16;// The apprach from above distance
+double cartesian_subdivide = .01;
 //geometry_msgs::Quaternion g_quat; // global var for quaternion
 Eigen::Quaterniond g_quat,g_quat2;
 Eigen::Matrix3d g_R,g_R2;
