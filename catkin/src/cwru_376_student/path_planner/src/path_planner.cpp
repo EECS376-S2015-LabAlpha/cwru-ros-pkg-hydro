@@ -54,7 +54,7 @@ DesStateGenerator::DesStateGenerator(ros::NodeHandle* nodehandle) : nh_(*nodehan
 
     odom_phi_ = 1000.0; // put in impossible value for heading; test this value to make sure we have received a viable odom message
     ROS_INFO("waiting for valid odom message...");
-    while (odom_phi_ > 500.0) {
+    while (odom_phi_ > 500.0 && ros::ok()) {
         ros::Duration(0.5).sleep(); // sleep for half a second
         std::cout << ".";
         ros::spinOnce();
@@ -734,6 +734,7 @@ void DesStateGenerator::update_des_state() {
         }
         if(waiting_for_vertex_) {
 			ROS_WARN("Waiting for vertext, publishing current odom!!");
+            current_odom_.twist.twist.linear.x = 0.0;
             des_state_publisher_.publish(current_odom_); //send out our message
             current_state_publisher_.publish(current_odom_);
         }
