@@ -441,7 +441,8 @@ void make_can_cloud(PointCloud<pcl::PointXYZ>::Ptr canCloud, double r_can, doubl
             i++;
         }
     //canCloud->header = inputCloud->header;
-    canCloud->header.frame_id = "kinect_pc_frame"; 
+    //canCloud->header.frame_id = "kinect_pc_frame"; 
+    canCloud->header.frame_id = "camera_depth_optical_frame"; //For abby we need the same id as the topic the cam is publishing... quick fix
     //canCloud->header.stamp = ros::Time::now();
     canCloud->is_dense = true;
     canCloud->width = npts;
@@ -542,7 +543,8 @@ int main(int argc, char** argv) {
     ps_in.pose.orientation.z = 0;
     ps_in.header.seq = 0;
     ps_in.header.stamp = ros::Time::now();
-    ps_in.header.frame_id = "/kinect_pc_frame";
+    //ps_in.header.frame_id = "/kinect_pc_frame";
+    ps_in.header.frame_id = "/camera_depth_optical_frame";//For abby we need the same id as the topic the cam is publishing... quick fix
     ps_out.pose.position.x = 0;
     ps_out.pose.position.y = 0;
     ps_out.pose.position.z = 0;
@@ -582,8 +584,8 @@ int main(int argc, char** argv) {
             << g_cloud_from_disk->width * g_cloud_from_disk->height
             << " data points from test_pcd.pcd  " << std::endl;
 
-    g_cloud_from_disk->header.frame_id = "kinect_pc_frame"; //looks like PCD does not encode the reference frame id
-
+    //g_cloud_from_disk->header.frame_id = "kinect_pc_frame"; //looks like PCD does not encode the reference frame id
+    g_cloud_from_disk->header.frame_id = "camera_depth_optical_frame"; //For abby we need the same id as the topic the cam is publishing... quick fix
     double z_threshold=0.0;
     double E;
     double dEdCx=0.0;
@@ -679,7 +681,7 @@ int main(int argc, char** argv) {
                         ps_out.pose.position = p;
                         ROS_INFO("ps_in: %f , %f , %f", ps_in.pose.position.x, ps_in.pose.position.y, ps_in.pose.position.z);
                         ROS_INFO("ps_in: frame: %s", ps_in.header.frame_id.c_str());
-                        g_tfl->transformPose("base_link", ps_in, ps_out);
+                        g_tfl->transformPose("base_link", ros::Time::now(), ps_in, "camera_depth_optical_frame", ps_out);
                         ps_out.pose.position.z += H_CYLINDER;
                         ROS_INFO("ps_out: %f , %f , %f", ps_out.pose.position.x, ps_out.pose.position.y, ps_out.pose.position.z);
                         ROS_INFO("ps_out: frame: %s", ps_out.header.frame_id.c_str());

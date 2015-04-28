@@ -67,7 +67,7 @@ void jointStateCB(
 const sensor_msgs::JointStatePtr &js_msg) { //THIS IS NOT GETTING CALLED!!!! I DONT KNOW WHY... FIX!!!
     
     for (int i=0;i<6;i++) {
-        g_q_state[i] = js_msg->position[i + 4]; //Based on the data, the first joint starts at index 4
+        g_q_state[i] = js_msg->position[i]; //Based on the data, the first joint starts at index 4
         //ROS_INFO("q_p_state is %f for %d",g_q_state[i + 4],i);
     }
     //cout<<"g_q_state: "<<g_q_state.transpose()<<endl;
@@ -168,6 +168,7 @@ double getTimeTraversalFromJoints(Vectorq6x1 initial_state, Vectorq6x1 end){
 void stuff_trajectory( std::vector<Vectorq6x1> qvec_array, int number_of_vecs, trajectory_msgs::JointTrajectory &new_trajectory, double wait_time) {
 
     new_trajectory.points.clear();
+    new_trajectory.joint_names.clear();
 
     new_trajectory.joint_names.push_back("joint_1");
     new_trajectory.joint_names.push_back("joint_2");
