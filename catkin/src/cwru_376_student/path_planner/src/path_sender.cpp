@@ -49,6 +49,19 @@ geometry_msgs::Pose xyPhi2Pose(double x, double y, double phi) {
     return pose;
 }
 
+double convertPlanarQuat2Phi(geometry_msgs::Quaternion quaternion) {
+    double quat_z = quaternion.z;
+    double quat_w = quaternion.w;
+    double phi = 2.0 * atan2(quat_z, quat_w); // cheap conversion from quaternion to heading for planar motion
+    //Make sure that the returned angle is within +- 2 * pi
+    /*while (phi < -6.2831853) {
+        phi += 6.2831853;
+    }
+    while (phi > 6.2831853) {
+        phi -= 6.2831853;
+    }*/
+    return phi;
+}
 
 //use this service to set processing modes interactively
 bool modeService(cwru_srv::simple_bool_service_messageRequest& request, cwru_srv::simple_bool_service_messageResponse& response) {
@@ -65,14 +78,14 @@ bool modeService(cwru_srv::simple_bool_service_messageRequest& request, cwru_srv
     vertex.header.stamp = ros::Time::now();
 
 
-    // geometry_msgs::Quaternion quaternion1;
-    // quaternion1.x = 0.0;
-    // quaternion1.y = 0.0;
-    // quaternion1.z = -0.9092;
-    // quaternion1.w = 0.4162;
+    geometry_msgs::Quaternion quaternion1;
+    quaternion1.x = IM_pose.orientation.x;
+    quaternion1.y = IM_pose.orientation.y;
+    quaternion1.z = IM_pose.orientation.z;
+    quaternion1.w = IM_pose.orientation.w;
     x=IM_pose.position.x;
     y=IM_pose.position.y;
-    //phi=convertPlanarQuat2Phi(quaternion1);
+    phi=convertPlanarQuat2Phi(quaternion1);
     ROS_INFO("vertex: x,y,phi = %f, %f %f",x,y,phi);
     vertex.pose = xyPhi2Pose(x,y,phi); //x,y,phi
     path_message.request.path.poses.push_back(vertex);
@@ -96,7 +109,10 @@ void processFeedback(
     ROS_INFO_STREAM("reference frame is: "<<feedback->header.frame_id);
     IM_pose.position.x = feedback->pose.position.x;
     IM_pose.position.y = feedback->pose.position.y;
-
+    IM_pose.orientation.x = feedback->pose.orientation.x;
+    IM_pose.orientation.y = feedback->pose.orientation.y;
+    IM_pose.orientation.z = feedback->pose.orientation.z;
+    IM_pose.orientation.w = feedback->pose.orientation.w;
 
 }
 

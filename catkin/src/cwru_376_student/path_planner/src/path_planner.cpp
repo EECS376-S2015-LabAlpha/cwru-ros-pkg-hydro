@@ -506,12 +506,14 @@ void DesStateGenerator::process_new_vertex() {
     spin_path_segment = build_spin_in_place_segment(v1, init_heading, des_heading);
     spin_path_segment2 = build_spin_in_place_segment(v2, des_heading, final_heading);
 
+    ROS_WARN("Quaternion is: %f, %f, %f, %f", pose2.orientation.x, pose2.orientation.y, pose2.orientation.z, pose2.orientation.w);
     //put these path segments in a vector: first spin, then move along lineseg:
     vec_of_path_segs.push_back(spin_path_segment);
     vec_of_path_segs.push_back(line_path_segment);
     vec_of_path_segs.push_back(spin_path_segment2);
     std::cout<<"vec of pathsegs[0] ="<<vec_of_path_segs[0]<<std::endl;
     std::cout<<"vec of pathsegs[1] ="<<vec_of_path_segs[1]<<std::endl;   
+    std::cout<<"vec of pathsegs[2] ="<<vec_of_path_segs[2]<<std::endl;  
     return vec_of_path_segs;
     }
  
@@ -810,9 +812,9 @@ nav_msgs::Odometry DesStateGenerator::update_des_state_spin() {
     current_omega_des_ = compute_omega_profile(); //USE VEL PROFILING 
     
     double delta_phi = current_omega_des_*dt_; //incremental rotation--could be + or -
-    ROS_INFO("update_des_state_spin: delta_phi = %f",delta_phi);
+    //ROS_INFO("update_des_state_spin: delta_phi = %f",delta_phi);
     current_seg_length_to_go_ -= fabs(delta_phi); // decrement the (absolute) distance (rotation) to go
-    ROS_INFO("update_des_state_spin: current_segment_length_to_go_ = %f",current_seg_length_to_go_);    
+    //ROS_INFO("update_des_state_spin: current_segment_length_to_go_ = %f",current_seg_length_to_go_);    
     
     if (current_seg_length_to_go_ < HEADING_TOL) { // check if done with this move
         current_seg_type_ = HALT;
