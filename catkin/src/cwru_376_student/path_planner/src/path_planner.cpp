@@ -482,6 +482,7 @@ void DesStateGenerator::process_new_vertex() {
     std::vector<cwru_msgs::PathSegment> DesStateGenerator::build_spin_then_line_path_segments(geometry_msgs::Pose pose1, geometry_msgs::Pose pose2) {
     cwru_msgs::PathSegment spin_path_segment; // a container for new path segment, spin
     cwru_msgs::PathSegment line_path_segment; // a container for new path segment, line  
+    cwru_msgs::PathSegment spin_path_segment2;
     std::vector<cwru_msgs::PathSegment> vec_of_path_segs; //container to hold results
     Eigen::Vector2d v1, v2;
     
@@ -498,14 +499,17 @@ void DesStateGenerator::process_new_vertex() {
     double init_heading = convertPlanarQuat2Phi(pose1.orientation);
     // goal heading will be derived from above line-segment orientation, as computed above
     double des_heading = convertPlanarQuat2Phi(line_path_segment.init_tan_angle);
-    
+    double final_heading = convertPlanar2Phi(pose2.orientation);
+
     // populate a PathSegment object corresponding to spin-in-place from initial heading to lineseg heading:
     
     spin_path_segment = build_spin_in_place_segment(v1, init_heading, des_heading);
-    
+    spin_path_segment2 = build_spin_in_place_segment(v2, des_heading, final_heading);
+
     //put these path segments in a vector: first spin, then move along lineseg:
     vec_of_path_segs.push_back(spin_path_segment);
     vec_of_path_segs.push_back(line_path_segment);
+    vec_of_path_segs.push_back(spin_path_segment2);
     std::cout<<"vec of pathsegs[0] ="<<vec_of_path_segs[0]<<std::endl;
     std::cout<<"vec of pathsegs[1] ="<<vec_of_path_segs[1]<<std::endl;   
     return vec_of_path_segs;
