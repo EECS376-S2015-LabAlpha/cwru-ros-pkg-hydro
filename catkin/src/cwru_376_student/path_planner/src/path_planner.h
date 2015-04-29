@@ -213,6 +213,7 @@ private:
     void lidarCallback(const lidar_space_detection::LidarSpace& lidar_rcvd);
     void eStopCallback(const std_msgs::Bool::ConstPtr& estop);
 
+
     //prototypes for service callbacks 
     bool flushPathCallback(cwru_srv::simple_bool_service_messageRequest& request, cwru_srv::simple_bool_service_messageResponse& response);
     bool appendPathCallback(cwru_srv::path_service_messageRequest& request, cwru_srv::path_service_messageResponse& response);

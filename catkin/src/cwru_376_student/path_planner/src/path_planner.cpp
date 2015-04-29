@@ -98,6 +98,7 @@ void DesStateGenerator::initializeSubscribers() {
     ROS_INFO("Initializing Subscribers");
     odom_subscriber_ = nh_.subscribe("/odom", 1, &DesStateGenerator::odomCallback, this); //subscribe to odom messages
     lidar_subscriber_ = nh_.subscribe("/lidar_spaces", 1, &DesStateGenerator::lidarCallback, this);
+
     // add more subscribers here, as needed
 }
 
@@ -114,6 +115,7 @@ void DesStateGenerator::initializeServices() {
             this);
     // add more services here, as needed
 }
+
 
 //member helper function to set up publishers;
 void DesStateGenerator::initializePublishers() {
@@ -320,7 +322,7 @@ geometry_msgs::PoseStamped DesStateGenerator::odom_to_map_pose(geometry_msgs::Po
 // should extend this to include blended circular arc path segments
 void DesStateGenerator::process_new_vertex() {
     if (path_queue_.empty()) { // do nothing
-		ROS_INFO("empty segment");
+		//ROS_INFO("empty segment");
         waiting_for_vertex_ = true;
         //current_seg_type_ = HALT;
         return;
@@ -609,17 +611,17 @@ void DesStateGenerator::eStopCallback(const std_msgs::Bool::ConstPtr& estop) {
 //  iterative re-use by "update_des_state"
 void DesStateGenerator::unpack_next_path_segment() {   
     cwru_msgs::PathSegment path_segment;
-     ROS_INFO("unpack_next_path_segment: ");
+     //ROS_INFO("unpack_next_path_segment: ");
      current_time = 0.0; //reset the segment elapsed time
     if (segment_queue_.empty()) {
-        ROS_INFO("no more segments in the path-segment queue");
+        //ROS_INFO("no more segments in the path-segment queue");
         process_new_vertex(); //build and enqueue more path segments, if possible
 
 
     }
     if (waiting_for_vertex_) {       
         //we need more path segments.  Do we have fanother path vertex available?
-        ROS_INFO("no more vertices in the path queue either...");
+        //ROS_INFO("no more vertices in the path queue either...");
         current_seg_type_=HALT; // nothing more we can do until get more subgoals
 
         return;
@@ -733,7 +735,7 @@ void DesStateGenerator::update_des_state() {
             des_state_ = update_des_state_halt();   
         }
         if(waiting_for_vertex_) {
-			ROS_WARN("Waiting for vertext, publishing current odom!!");
+			//ROS_WARN("Waiting for vertext, publishing current odom!!");
             current_odom_.twist.twist.linear.x = 0.0;
             des_state_publisher_.publish(current_odom_); //send out our message
             current_state_publisher_.publish(current_odom_);
