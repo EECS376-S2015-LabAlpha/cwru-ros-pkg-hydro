@@ -499,7 +499,7 @@ void DesStateGenerator::process_new_vertex() {
     double init_heading = convertPlanarQuat2Phi(pose1.orientation);
     // goal heading will be derived from above line-segment orientation, as computed above
     double des_heading = convertPlanarQuat2Phi(line_path_segment.init_tan_angle);
-    double final_heading = convertPlanar2Phi(pose2.orientation);
+    double final_heading = convertPlanarQuat2Phi(pose2.orientation);
 
     // populate a PathSegment object corresponding to spin-in-place from initial heading to lineseg heading:
     
