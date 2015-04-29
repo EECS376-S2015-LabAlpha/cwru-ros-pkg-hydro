@@ -20,6 +20,7 @@ SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++0x")
 # Executables
 cs_add_executable(path_planner src/path_planner.cpp)
 cs_add_executable(path_sender_ghetto src/path_sender.cpp)
+cs_add_executable(IM_driver src/IM_driver.cpp)
 #cs_add_executable(path_sender_starting src/path_sender_starting_pen.cpp)
 # target_link_library(example my_lib)
 

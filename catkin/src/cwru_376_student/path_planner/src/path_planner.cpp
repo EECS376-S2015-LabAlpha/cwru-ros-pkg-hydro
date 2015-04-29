@@ -61,6 +61,7 @@ DesStateGenerator::DesStateGenerator(ros::NodeHandle* nodehandle) : nh_(*nodehan
     }
     //ROS_WARN("Segfaul4");
     ROS_INFO("constructor: got an odom message");
+    ROS_INFO("x: %f y: %f", odom_x_, odom_y_);
     
     dt_ = 1.0/UPDATE_RATE; // time step consistent with update frequency
     //initialize variables here, as needed
