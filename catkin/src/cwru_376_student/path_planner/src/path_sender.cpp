@@ -107,11 +107,11 @@ int main(int argc, char **argv) {
     client = nh.serviceClient<cwru_srv::path_service_message>("appendPathService");
 
 
-    ros::ServiceServer service = nh.advertiseService("process_mode", modeService);
+    ros::ServiceServer service = nh.advertiseService("drive_mode", modeService);
     //ros::Subscriber sub = nh.subscribe("/robot0/odom", 1, odomCallback);
     //ros::Rate rtimer(1 / DT); // frequency corresponding to chosen sample period 
 
-    ros::Subscriber IM_subscriber_ = nh.subscribe("/example_marker/feedback", 1, processFeedback);
+    ros::Subscriber IM_subscriber_ = nh.subscribe("/driver_marker/feedback", 1, processFeedback);
     //cwru_srv::path_service_message path_message;
     //geometry_msgs::PoseStamped vertex;  // this contains a header and a pose; the pose contains a point and a quaternion
     //double x,y,phi;

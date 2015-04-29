@@ -1,6 +1,7 @@
-// IM_6DOF_example.cpp
+// IM_driver.cpp
+// William Baskin based on:
 // Wyatt Newman, based on ROS tutorial 4.2 on Interactive Markers
-// example 2 differs from example 1 only in that the marker frame_ID is set to "base_link"
+
 #include <ros/ros.h>
 #include <iostream>
 #include <interactive_markers/interactive_marker_server.h>
@@ -11,8 +12,7 @@
     
     
     
-void processFeedback(
-        const visualization_msgs::InteractiveMarkerFeedbackConstPtr &feedback) {
+void processFeedback( const visualization_msgs::InteractiveMarkerFeedbackConstPtr &feedback) {
     ROS_INFO_STREAM(feedback->marker_name << " is now at "
             << feedback->pose.position.x << ", " << feedback->pose.position.y
             << ", " << feedback->pose.position.z);
@@ -31,85 +31,38 @@ geometry_msgs::Quaternion convertPlanarPhi2Quaternion(double phi) {
 
 //utility to fill a Pose object from planar x,y,phi info
 geometry_msgs::Pose xyPhi2Pose(double x, double y, double phi) {
-    geometry_msgs::Pose pose; // a pose object to populate
-    pose.orientation = convertPlanarPhi2Quaternion(phi); // convert from heading to corresponding quaternion
-    pose.position.x = x; // keep the robot on the ground!
-    pose.position.y = y; // keep the robot on the ground!    
-    pose.position.z = 0.0; // keep the robot on the ground!  
+    geometry_msgs::Pose pose;
+    pose.orientation = convertPlanarPhi2Quaternion(phi);
+    pose.position.x = x;
+    pose.position.y = y;
+    pose.position.z = 0.0;  
     return pose;
 }
 
 double convertPlanarQuat2Phi(geometry_msgs::Quaternion quaternion) {
     double quat_z = quaternion.z;
     double quat_w = quaternion.w;
-    double phi = 2.0 * atan2(quat_z, quat_w); // cheap conversion from quaternion to heading for planar motion
-    //Make sure that the returned angle is within +- 2 * pi
-    /*while (phi < -6.2831853) {
-        phi += 6.2831853;
-    }
-    while (phi > 6.2831853) {
-        phi -= 6.2831853;
-    }*/
+    double phi = 2.0 * atan2(quat_z, quat_w);
     return phi;
 }
 
 int main(int argc, char** argv) {
-    ros::init(argc, argv, "simple_marker"); // this will be the node name;
+    ros::init(argc, argv, "IM_driver"); 
 
-
-
-
-
-
-
-    // geometry_msgs::Quaternion quaternion2;
-    // quaternion2.x = 0.0;
-    // quaternion2.y = 0.0;
-    // quaternion2.z = 0.9305;
-    // quaternion2.w = 0.3663;
-    // x=5.099;
-    // y=12.208;
-    // phi=convertPlanarQuat2Phi(quaternion2);
-    // ROS_INFO("vertex: x,y,phi = %f, %f %f",x,y,phi);
-    // vertex.pose = xyPhi2Pose(x,y,phi); //x,y,phi  
-    // path_message.request.path.poses.push_back(vertex);
-
-
-
-
-
-
-
-    // create an interactive marker server on the topic namespace simple_marker
-    interactive_markers::InteractiveMarkerServer server("example_marker");
-    // look for resulting pose messages on the topic: /simple_marker/feedback,
-    // which publishes a message of type visualization_msgs/InteractiveMarkerFeedback, which
-    // includes a full "pose" of the marker.
-    // Coordinates of the pose are with respect to the pelvis frame
-
-    // create an interactive marker for our server
+    interactive_markers::InteractiveMarkerServer server("driver_marker");
+    
     visualization_msgs::InteractiveMarker int_marker;
-    // later, change the reference frame to the "map" frame
-    int_marker.header.frame_id = "/odom"; ///world"; // the reference frame for pose coordinates
-    int_marker.name = "des_hand_pose"; //name the marker
-    int_marker.description = "Interactive Marker";
+    
+    int_marker.header.frame_id = "/odom";
+    int_marker.name = "des_robot_pose";
+    int_marker.description = "Interactive Marker for Driving";
 
-    //visualization_msgs::Marker sphere_marker; //all we need is a vertex
-    //sphere_marker.type = visualization_msgs::Marker::SPHERE;     
     geometry_msgs::Point temp_point_start;
-    /** specify/push-in the origin for this marker */
-    temp_point_start.x = 1.5; 
+
+    temp_point_start.x = 0.0; 
     temp_point_start.y = 0.0;
-    temp_point_start.z = 1;
-    //sphere_marker.points.push_back(temp_point_start);
-    //sphere_marker.color.r = 1.0; // make this marker red
-    //sphere_marker.color.g = 0.0;
-    //sphere_marker.color.b = 0.0;
-    //sphere_marker.color.a = 1.0;   
-     // scale the sphere size
-    //sphere_marker.scale.x = 0.1;
-    //sphere_marker.scale.y = 0.1;
-    //sphere_marker.scale.z = 0.1;
+    temp_point_start.z = 0.0;
+
     
   /**/
     // create an arrow marker; do this 3 times to create a triad (frame)
@@ -158,26 +111,6 @@ int main(int argc, char** argv) {
     arrow_marker_y.color.b = 0.0;
     arrow_marker_y.color.a = 1.0;
 
-    // now the z axis
-    visualization_msgs::Marker arrow_marker_z;
-    arrow_marker_z.type = visualization_msgs::Marker::ARROW; //CUBE;
-    // Push in the origin point for the arrow 
-    temp_point.x = temp_point.y = temp_point.z = 0;
-    arrow_marker_z.points.push_back(temp_point);
-   // Push in the end point for the arrow 
-    temp_point.x = 0.0;
-    temp_point.y = 0.0;
-    temp_point.z = 0.2;
-    arrow_marker_z.points.push_back(temp_point);
-
-    arrow_marker_z.scale.x = 0.01;
-    arrow_marker_z.scale.y = 0.01;
-    arrow_marker_z.scale.z = 0.01;
-
-    arrow_marker_z.color.r = 0.0;
-    arrow_marker_z.color.g = 0.0;
-    arrow_marker_z.color.b = 1.0;
-    arrow_marker_z.color.a = 1.0;
 /**/
     // create a control that contains the markers
     visualization_msgs::InteractiveMarkerControl IM_control;
@@ -186,7 +119,6 @@ int main(int argc, char** argv) {
     
     IM_control.markers.push_back(arrow_marker_x);
     IM_control.markers.push_back(arrow_marker_y);
-    IM_control.markers.push_back(arrow_marker_z);
     
     // add the control to the interactive marker
     int_marker.controls.push_back(IM_control);
@@ -198,16 +130,6 @@ int main(int argc, char** argv) {
     translate_control_x.name = "move_x";
     translate_control_x.interaction_mode =
         visualization_msgs::InteractiveMarkerControl::MOVE_AXIS;
-
-    /** Create the Z-Axis Control*/
-    visualization_msgs::InteractiveMarkerControl translate_control_z;
-    translate_control_z.name = "move_z";
-    translate_control_z.interaction_mode =
-            visualization_msgs::InteractiveMarkerControl::MOVE_AXIS;
-    translate_control_z.orientation.x = 0; //point this in the y direction
-    translate_control_z.orientation.y = 1;
-    translate_control_z.orientation.z = 0;
-    translate_control_z.orientation.w = 1;
 
     /** Create the Y-Axis Control*/
     visualization_msgs::InteractiveMarkerControl translate_control_y;
@@ -221,41 +143,19 @@ int main(int argc, char** argv) {
 
     // add x-rotation control
   /**/
-    visualization_msgs::InteractiveMarkerControl rotx_control;
-    rotx_control.always_visible = true;
-    rotx_control.interaction_mode = visualization_msgs::InteractiveMarkerControl::ROTATE_AXIS;
-    rotx_control.orientation.x = 1;
-    rotx_control.orientation.y = 0;
-    rotx_control.orientation.z = 0;
-    rotx_control.orientation.w = 1;
-    rotx_control.name = "rot_x";
-
-    // add z-rotation control
-    visualization_msgs::InteractiveMarkerControl rotz_control;
-    rotz_control.always_visible = true;
-    rotz_control.interaction_mode = visualization_msgs::InteractiveMarkerControl::ROTATE_AXIS;
-    rotz_control.orientation.x = 0;
-    rotz_control.orientation.y = 1;
-    rotz_control.orientation.z = 0;
-    rotz_control.orientation.w = 1;
-    rotz_control.name = "rot_z";
-
     // add y-rotation control
     visualization_msgs::InteractiveMarkerControl roty_control;
     roty_control.always_visible = true;
     roty_control.interaction_mode = visualization_msgs::InteractiveMarkerControl::ROTATE_AXIS;
     roty_control.orientation.x = 0;
-    roty_control.orientation.y = 0;
-    roty_control.orientation.z = 1;
+    roty_control.orientation.y = 1;
+    roty_control.orientation.z = 0;
     roty_control.orientation.w = 1;
-    roty_control.name = "rot_y";
+    roty_control.name = "rot_z";
 /**/
     // add the controls to the interactive marker
     int_marker.controls.push_back(translate_control_x);    
-    int_marker.controls.push_back(translate_control_y);    
-    int_marker.controls.push_back(translate_control_z);
-    int_marker.controls.push_back(rotx_control);
-    int_marker.controls.push_back(rotz_control);
+    int_marker.controls.push_back(translate_control_y);
     int_marker.controls.push_back(roty_control);
     
     /** Scale Down: this makes all of the arrows/disks for the user controls smaller than the default size */
