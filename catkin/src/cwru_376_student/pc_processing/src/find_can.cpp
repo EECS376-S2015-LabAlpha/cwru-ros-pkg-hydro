@@ -636,7 +636,7 @@ int main(int argc, char** argv) {
                     // g_cylinder_origin = array x3 of x,y,z location for the bottom center of the can
                     // TODO check
                     for (int i=0;i<3;i++) {
-                        g_cylinder_origin[i] = g_patch_centroid[i] - 3 * g_patch_normal[i]/normal_norm*can_radius; // offset it back 1 can radius
+                        g_cylinder_origin[i] = g_patch_centroid[i] - 2.5 * g_patch_normal[i]/normal_norm*can_radius; // offset it back 1 can radius
                     }
                     ROS_INFO("cylinder origin: %f , %f, %f", g_cylinder_origin[0], g_cylinder_origin[1], g_cylinder_origin[2]);
                     
