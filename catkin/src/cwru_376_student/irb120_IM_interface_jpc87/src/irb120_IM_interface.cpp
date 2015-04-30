@@ -28,7 +28,7 @@ Eigen::Vector3d g_p,g_p2; //where I want to go
 Vectorq6x1 g_q_state; //where I be at
 double g_x,g_y,g_z;
 double frequency = 10.0;
-double hand_offset = .08;//offset for hand
+double hand_offset = .1;//offset for hand
 double elevation_approach = .16;// The apprach from above distance
 double cartesian_subdivide = .01;
 //geometry_msgs::Quaternion g_quat; // global var for quaternion
@@ -47,6 +47,7 @@ void markerListenerCB(
         const visualization_msgs::InteractiveMarkerFeedbackConstPtr &feedback) {
     ROS_INFO_STREAM("marker frame_id is "<<feedback->header.frame_id);
     g_marker_pose_in.header = feedback->header;
+    g_marker_pose_in.header.stamp = ros::Time::now();
     g_marker_pose_in.pose=feedback->pose;
      g_tfListener->transformPose("link1", g_marker_pose_in, g_marker_pose_wrt_arm_base);
      
@@ -77,6 +78,8 @@ const sensor_msgs::JointStatePtr &js_msg) { //THIS IS NOT GETTING CALLED!!!! I D
 //obtain point to reach from above
 void canListenerCB(const geometry_msgs::PoseStamped &pose){
     ROS_INFO("canListenerCB callback activated");
+    g_marker_pose_in = pose;
+    g_marker_pose_in.header.stamp = ros::Time::now();
     g_tfListener->transformPose("link1", pose, g_marker_pose_wrt_arm_base);
 
     g_p[0] = g_marker_pose_wrt_arm_base.pose.position.x - hand_offset - elevation_approach;

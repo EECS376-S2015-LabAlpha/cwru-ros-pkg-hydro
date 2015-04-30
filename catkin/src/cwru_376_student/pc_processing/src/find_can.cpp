@@ -534,6 +534,25 @@ int main(int argc, char** argv) {
 
     // tf stuff
     g_tfl = new tf::TransformListener;
+    tf::StampedTransform camtobasel;
+    bool tferr = false;
+    while (tferr & ros::ok()) {
+            tferr=false;
+            try {
+                    //try to lookup transform from target frame "odom" to source frame "map"
+                //The direction of the transform returned will be from the target_frame to the source_frame. 
+                 //Which if applied to data, will transform data in the source_frame into the target_frame. See tf/CoordinateFrameConventions#Transform_Direction
+                    
+                    //g_tfl->lookupTransform("kinect_pc_frame", "base_link", ros::Time(0), camtobasel);
+                    g_tfl->lookupTransform("camera_depth_optical_frame", "base_link", ros::Time(0), camtobasel);
+                } catch(tf::TransformException &exception) {
+                    ROS_ERROR("%s", exception.what());
+                    tferr=true;
+                    ros::Duration(0.5).sleep(); // sleep for half a second
+                    ros::spinOnce();                
+                }   
+        }
+
     ps_in.pose.position.x = 0;
     ps_in.pose.position.y = 0;
     ps_in.pose.position.z = 0;
@@ -681,6 +700,9 @@ int main(int argc, char** argv) {
                         ps_out.pose.position = p;
                         ROS_INFO("ps_in: %f , %f , %f", ps_in.pose.position.x, ps_in.pose.position.y, ps_in.pose.position.z);
                         ROS_INFO("ps_in: frame: %s", ps_in.header.frame_id.c_str());
+                        ps_in.header.stamp = ros::Time::now();
+                        
+                        //g_tfl->transformPose("base_link", ros::Time::now(), ps_in, "kinect_pc_frame", ps_out);
                         g_tfl->transformPose("base_link", ros::Time::now(), ps_in, "camera_depth_optical_frame", ps_out);
                         ps_out.pose.position.z += H_CYLINDER;
                         ROS_INFO("ps_out: %f , %f , %f", ps_out.pose.position.x, ps_out.pose.position.y, ps_out.pose.position.z);
