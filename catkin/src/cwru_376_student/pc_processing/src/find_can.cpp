@@ -42,6 +42,7 @@ using namespace pcl::io;
 
 // TF to base
 tf::TransformListener* g_tfl;
+ros::Time* t;
 geometry_msgs::PoseStamped ps_in;
 geometry_msgs::PoseStamped ps_out;
 
@@ -575,7 +576,7 @@ int main(int argc, char** argv) {
     std::vector<int> indices_pts_above_plane;
 
     //load a pointcloud from file: 
-    /*if (pcl::io::loadPCDFile<pcl::PointXYZ> ("test_pcd.pcd", *g_cloud_from_disk) == -1) //* load the file
+    if (pcl::io::loadPCDFile<pcl::PointXYZ> ("test_pcd.pcd", *g_cloud_from_disk) == -1) //* load the file
     {
         PCL_ERROR("Couldn't read file test_pcd.pcd \n");
         return (-1);
@@ -585,7 +586,7 @@ int main(int argc, char** argv) {
             << " data points from test_pcd.pcd  " << std::endl;
 
     g_cloud_from_disk->header.frame_id = "kinect_pc_frame"; //looks like PCD does not encode the reference frame id
-	*/
+	
     //g_cloud_from_disk->header.frame_id = "kinect_pc_frame"; //looks like PCD does not encode the reference frame id
     g_cloud_from_disk->header.frame_id = "camera_depth_optical_frame"; //For abby we need the same id as the topic the cam is publishing... quick fix
 
@@ -601,7 +602,7 @@ int main(int argc, char** argv) {
     geometry_msgs::PoseStamped p2p;
     p2p.header.frame_id = "base_link";
     p2p.header.stamp = ros::Time::now();
-
+	double secs;
     while (ros::ok()) {
         if (g_trigger) {
             g_trigger = false; // reset the trigger
@@ -684,7 +685,9 @@ int main(int argc, char** argv) {
                         ps_out.pose.position = p;
                         ROS_INFO("ps_in: %f , %f , %f", ps_in.pose.position.x, ps_in.pose.position.y, ps_in.pose.position.z);
                         ROS_INFO("ps_in: frame: %s", ps_in.header.frame_id.c_str());
-                        g_tfl->transformPose("base_link", ros::Time::now(), ps_in, "camera_depth_optical_frame", ps_out);
+                        secs = ros::Time::now().toSec()-0.5;
+                        t = new ros::Time(secs);
+                        g_tfl->transformPose("base_link", *t, ps_in, "camera_depth_optical_frame", ps_out);
                         ps_out.pose.position.z += H_CYLINDER;
                         ROS_INFO("ps_out: %f , %f , %f", ps_out.pose.position.x, ps_out.pose.position.y, ps_out.pose.position.z);
                         ROS_INFO("ps_out: frame: %s", ps_out.header.frame_id.c_str());
