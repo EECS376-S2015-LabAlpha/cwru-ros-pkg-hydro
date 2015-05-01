@@ -188,7 +188,7 @@ void SteeringController::my_clever_steering_algorithm() {
 
     twist_cmd_.linear.x = des_state_vel_+speed_correction;
 
-    ROS_INFO("\ncorrection: steering | speed \n   %f | %f ", twist_cmd_.angular.z, twist_cmd_.linear.x);
+    ROS_INFO("\ncorrection: angular v | forward v \n   %f | %f ", twist_cmd_.angular.z, twist_cmd_.linear.x);
 
     twist_cmd2_.twist = twist_cmd_; // copy the twist command into twist2 message
     twist_cmd2_.header.stamp = ros::Time::now(); // look up the time and put it in the header 

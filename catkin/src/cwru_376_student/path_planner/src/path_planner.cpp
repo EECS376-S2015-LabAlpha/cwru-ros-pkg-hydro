@@ -30,7 +30,7 @@ DesStateGenerator::DesStateGenerator(ros::NodeHandle* nodehandle) : nh_(*nodehan
     tfListener_ = new tf::TransformListener;  //create a transform listener
     
     // wait to start receiving valid tf transforms between map and odom:
-    bool tferr=true;
+    /*bool tferr=true;
     ROS_INFO("waiting for tf between map and odom...");
     while (tferr && ros::ok()){
         tferr=false;
@@ -45,7 +45,7 @@ DesStateGenerator::DesStateGenerator(ros::NodeHandle* nodehandle) : nh_(*nodehan
                 ros::Duration(0.5).sleep(); // sleep for half a second
                 ros::spinOnce();                
             }   
-    }
+    }*/
     // from now on, tfListener will keep track of transforms 
     
     initializeSubscribers(); // package up the messy work of creating subscribers; do this overhead in constructor
@@ -54,13 +54,14 @@ DesStateGenerator::DesStateGenerator(ros::NodeHandle* nodehandle) : nh_(*nodehan
 
     odom_phi_ = 1000.0; // put in impossible value for heading; test this value to make sure we have received a viable odom message
     ROS_INFO("waiting for valid odom message...");
-    while (odom_phi_ > 500.0) {
+    while (odom_phi_ > 500.0 && ros::ok()) {
         ros::Duration(0.5).sleep(); // sleep for half a second
         std::cout << ".";
         ros::spinOnce();
     }
     //ROS_WARN("Segfaul4");
     ROS_INFO("constructor: got an odom message");
+    ROS_INFO("x: %f y: %f", odom_x_, odom_y_);
     
     dt_ = 1.0/UPDATE_RATE; // time step consistent with update frequency
     //initialize variables here, as needed
@@ -98,6 +99,7 @@ void DesStateGenerator::initializeSubscribers() {
     ROS_INFO("Initializing Subscribers");
     odom_subscriber_ = nh_.subscribe("/odom", 1, &DesStateGenerator::odomCallback, this); //subscribe to odom messages
     lidar_subscriber_ = nh_.subscribe("/lidar_spaces", 1, &DesStateGenerator::lidarCallback, this);
+
     // add more subscribers here, as needed
 }
 
@@ -114,6 +116,7 @@ void DesStateGenerator::initializeServices() {
             this);
     // add more services here, as needed
 }
+
 
 //member helper function to set up publishers;
 void DesStateGenerator::initializePublishers() {
@@ -320,7 +323,7 @@ geometry_msgs::PoseStamped DesStateGenerator::odom_to_map_pose(geometry_msgs::Po
 // should extend this to include blended circular arc path segments
 void DesStateGenerator::process_new_vertex() {
     if (path_queue_.empty()) { // do nothing
-		ROS_INFO("empty segment");
+		//ROS_INFO("empty segment");
         waiting_for_vertex_ = true;
         //current_seg_type_ = HALT;
         return;
@@ -341,8 +344,8 @@ void DesStateGenerator::process_new_vertex() {
     // we want to build path segments to take us from the current pose to the new goal pose
     // the goal pose is transformed to odom coordinates at the last moment, to minimize odom drift issues
     geometry_msgs::Pose map_pose = map_pose_stamped.pose; //strip off the header to simplify notation
-    geometry_msgs::PoseStamped goal_pose_wrt_odom = map_to_odom_pose(map_pose_stamped); // convert new subgoal pose from map to odom coords
-    //geometry_msgs::PoseStamped goal_pose_wrt_odom = map_pose_stamped;
+    //geometry_msgs::PoseStamped goal_pose_wrt_odom = map_to_odom_pose(map_pose_stamped); // convert new subgoal pose from map to odom coords
+    geometry_msgs::PoseStamped goal_pose_wrt_odom = map_pose_stamped;
     geometry_msgs::Pose start_pose_wrt_odom;  // this should be the starting point for our next journey segment
 
     last_map_pose_rcvd_ = map_pose_stamped; // save a copy of this subgoal in memory, in case we need it later
@@ -479,6 +482,7 @@ void DesStateGenerator::process_new_vertex() {
     std::vector<cwru_msgs::PathSegment> DesStateGenerator::build_spin_then_line_path_segments(geometry_msgs::Pose pose1, geometry_msgs::Pose pose2) {
     cwru_msgs::PathSegment spin_path_segment; // a container for new path segment, spin
     cwru_msgs::PathSegment line_path_segment; // a container for new path segment, line  
+    cwru_msgs::PathSegment spin_path_segment2;
     std::vector<cwru_msgs::PathSegment> vec_of_path_segs; //container to hold results
     Eigen::Vector2d v1, v2;
     
@@ -495,16 +499,21 @@ void DesStateGenerator::process_new_vertex() {
     double init_heading = convertPlanarQuat2Phi(pose1.orientation);
     // goal heading will be derived from above line-segment orientation, as computed above
     double des_heading = convertPlanarQuat2Phi(line_path_segment.init_tan_angle);
-    
+    double final_heading = convertPlanarQuat2Phi(pose2.orientation);
+
     // populate a PathSegment object corresponding to spin-in-place from initial heading to lineseg heading:
     
     spin_path_segment = build_spin_in_place_segment(v1, init_heading, des_heading);
-    
+    spin_path_segment2 = build_spin_in_place_segment(v2, des_heading, final_heading);
+
+    ROS_WARN("Quaternion is: %f, %f, %f, %f", pose2.orientation.x, pose2.orientation.y, pose2.orientation.z, pose2.orientation.w);
     //put these path segments in a vector: first spin, then move along lineseg:
     vec_of_path_segs.push_back(spin_path_segment);
     vec_of_path_segs.push_back(line_path_segment);
+    vec_of_path_segs.push_back(spin_path_segment2);
     std::cout<<"vec of pathsegs[0] ="<<vec_of_path_segs[0]<<std::endl;
     std::cout<<"vec of pathsegs[1] ="<<vec_of_path_segs[1]<<std::endl;   
+    std::cout<<"vec of pathsegs[2] ="<<vec_of_path_segs[2]<<std::endl;  
     return vec_of_path_segs;
     }
  
@@ -609,17 +618,17 @@ void DesStateGenerator::eStopCallback(const std_msgs::Bool::ConstPtr& estop) {
 //  iterative re-use by "update_des_state"
 void DesStateGenerator::unpack_next_path_segment() {   
     cwru_msgs::PathSegment path_segment;
-     ROS_INFO("unpack_next_path_segment: ");
+     //ROS_INFO("unpack_next_path_segment: ");
      current_time = 0.0; //reset the segment elapsed time
     if (segment_queue_.empty()) {
-        ROS_INFO("no more segments in the path-segment queue");
+        //ROS_INFO("no more segments in the path-segment queue");
         process_new_vertex(); //build and enqueue more path segments, if possible
 
 
     }
     if (waiting_for_vertex_) {       
         //we need more path segments.  Do we have fanother path vertex available?
-        ROS_INFO("no more vertices in the path queue either...");
+        //ROS_INFO("no more vertices in the path queue either...");
         current_seg_type_=HALT; // nothing more we can do until get more subgoals
 
         return;
@@ -733,7 +742,8 @@ void DesStateGenerator::update_des_state() {
             des_state_ = update_des_state_halt();   
         }
         if(waiting_for_vertex_) {
-			ROS_WARN("Waiting for vertext, publishing current odom!!");
+			//ROS_WARN("Waiting for vertext, publishing current odom!!");
+            current_odom_.twist.twist.linear.x = 0.0;
             des_state_publisher_.publish(current_odom_); //send out our message
             current_state_publisher_.publish(current_odom_);
         }
@@ -802,9 +812,9 @@ nav_msgs::Odometry DesStateGenerator::update_des_state_spin() {
     current_omega_des_ = compute_omega_profile(); //USE VEL PROFILING 
     
     double delta_phi = current_omega_des_*dt_; //incremental rotation--could be + or -
-    ROS_INFO("update_des_state_spin: delta_phi = %f",delta_phi);
+    //ROS_INFO("update_des_state_spin: delta_phi = %f",delta_phi);
     current_seg_length_to_go_ -= fabs(delta_phi); // decrement the (absolute) distance (rotation) to go
-    ROS_INFO("update_des_state_spin: current_segment_length_to_go_ = %f",current_seg_length_to_go_);    
+    //ROS_INFO("update_des_state_spin: current_segment_length_to_go_ = %f",current_seg_length_to_go_);    
     
     if (current_seg_length_to_go_ < HEADING_TOL) { // check if done with this move
         current_seg_type_ = HALT;

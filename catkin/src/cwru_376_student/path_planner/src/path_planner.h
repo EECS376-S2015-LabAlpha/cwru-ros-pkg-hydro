@@ -67,9 +67,9 @@ const double UPDATE_RATE = 50.0; // choose the desired-state publication update 
 
 
 // dynamic limitations
-const double MAX_SPEED = 1; // m/sec; adjust this
+const double MAX_SPEED = 0.5; // m/sec; adjust this
 const double MAX_OMEGA = 0.5; //1.0; // rad/sec; adjust this
-const double MAX_ACCEL = 1; // m/sec^2; adjust this
+const double MAX_ACCEL = 0.5; // m/sec^2; adjust this
 const double MAX_ALPHA = 0.25; // rad/sec^2; adjust this
 
 const double LENGTH_TOL = 0.001; // tolerance for path; adjust this
@@ -212,6 +212,7 @@ private:
     void odomCallback(const nav_msgs::Odometry& odom_rcvd);
     void lidarCallback(const lidar_space_detection::LidarSpace& lidar_rcvd);
     void eStopCallback(const std_msgs::Bool::ConstPtr& estop);
+
 
     //prototypes for service callbacks 
     bool flushPathCallback(cwru_srv::simple_bool_service_messageRequest& request, cwru_srv::simple_bool_service_messageResponse& response);
